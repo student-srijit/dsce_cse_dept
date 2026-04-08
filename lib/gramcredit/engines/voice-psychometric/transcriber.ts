@@ -199,25 +199,3 @@ function estimateAudioDuration(audioBuffer: Buffer): number {
   return audioBuffer.length / bytesPerSecond;
 }
 
-/**
- * Fallback transcriber for testing (mock)
- * Returns a realistic OCEAN-testable transcript
- */
-export function mockTranscribeAudio(audioLength: number): TranscriptionResult {
-  const mockTranscripts = [
-    "I believe I am responsible for my actions and always deliver what I promise. I try to stay organized and plan ahead. I get nervous sometimes but I work through it. I enjoy working with others and helping them succeed.",
-    "It's important to be careful and think things through before acting. I like to keep things in order and respect rules. I can be anxious about new situations, but I adapt well. I value my relationships with family and friends.",
-    "I prefer to try new things and take some risks. Planning isn't really my strength, I like to go with the flow. I'm generally pretty calm, even in stressful situations. I can be direct sometimes, but I care about people.",
-  ];
-
-  const transcript =
-    mockTranscripts[Math.floor(Math.random() * mockTranscripts.length)];
-
-  return {
-    text: transcript,
-    confidence: 0.85,
-    language: "en",
-    duration: audioLength / (16000 * 2), // Estimate
-    speechQualityScore: 75 + Math.random() * 20,
-  };
-}

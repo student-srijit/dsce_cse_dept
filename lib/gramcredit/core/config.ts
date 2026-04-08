@@ -30,6 +30,8 @@ const SocialGraphConfigSchema = z.object({
   transactionThresholdDays: z.number().default(90),
   minClusterSize: z.number().default(3),
   trustNormalization: z.enum(["minmax", "zscore"]).default("minmax"),
+  connectorUrl: z.string().url().optional(),
+  connectorApiKey: z.string().optional(),
 });
 
 const SatelliteConfigSchema = z.object({
@@ -42,8 +44,10 @@ const SatelliteConfigSchema = z.object({
     critical: z.number().default(0.1),
   }),
   anomalyDetectionSensitivity: z.number().default(2.5),
-  defaultProvider: z.enum(["sentinel", "bhuvan", "mock"]).default("mock"),
+  defaultProvider: z.enum(["sentinel", "bhuvan"]).default("bhuvan"),
   imageSearchWindowDays: z.number().default(30),
+  connectorUrl: z.string().url().optional(),
+  connectorApiKey: z.string().optional(),
 });
 
 const BehaviorConfigSchema = z.object({
@@ -52,6 +56,8 @@ const BehaviorConfigSchema = z.object({
   rechargeRegularityWeight: z.number().min(0).max(1).default(0.4),
   transactionFrequencyWeight: z.number().min(0).max(1).default(0.6),
   anomalyThreshold: z.number().default(3),
+  connectorUrl: z.string().url().optional(),
+  connectorApiKey: z.string().optional(),
 });
 
 const FusionConfigSchema = z.object({
@@ -163,6 +169,8 @@ export function loadGramCreditConfig(): GramCreditConfig {
         parseInt(process.env.GRAMCREDIT_MIN_CLUSTER_SIZE),
       trustNormalization: process.env
         .GRAMCREDIT_TRUST_NORMALIZATION as "minmax" | "zscore" | undefined,
+      connectorUrl: process.env.GRAMCREDIT_SOCIAL_CONNECTOR_URL,
+      connectorApiKey: process.env.GRAMCREDIT_SOCIAL_CONNECTOR_API_KEY,
     },
     satellite: {
       sentinelHubClientId: process.env.SENTINEL_HUB_CLIENT_ID,
@@ -183,10 +191,12 @@ export function loadGramCreditConfig(): GramCreditConfig {
         process.env.GRAMCREDIT_ANOMALY_SENSITIVITY &&
         parseFloat(process.env.GRAMCREDIT_ANOMALY_SENSITIVITY),
       defaultProvider: process.env
-        .GRAMCREDIT_SATELLITE_PROVIDER as "sentinel" | "bhuvan" | "mock" | undefined,
+        .GRAMCREDIT_SATELLITE_PROVIDER as "sentinel" | "bhuvan" | undefined,
       imageSearchWindowDays:
         process.env.GRAMCREDIT_IMAGE_SEARCH_DAYS &&
         parseInt(process.env.GRAMCREDIT_IMAGE_SEARCH_DAYS),
+      connectorUrl: process.env.GRAMCREDIT_SATELLITE_CONNECTOR_URL,
+      connectorApiKey: process.env.GRAMCREDIT_SATELLITE_CONNECTOR_API_KEY,
     },
     behavior: {
       consistencyWindowDays:
@@ -204,6 +214,8 @@ export function loadGramCreditConfig(): GramCreditConfig {
       anomalyThreshold:
         process.env.GRAMCREDIT_BEHAVIOR_ANOMALY_THRESHOLD &&
         parseFloat(process.env.GRAMCREDIT_BEHAVIOR_ANOMALY_THRESHOLD),
+      connectorUrl: process.env.GRAMCREDIT_BEHAVIOR_CONNECTOR_URL,
+      connectorApiKey: process.env.GRAMCREDIT_BEHAVIOR_CONNECTOR_API_KEY,
     },
     fusion: {
       weights: {
@@ -242,6 +254,7 @@ export function loadGramCreditConfig(): GramCreditConfig {
           parseInt(process.env.GRAMCREDIT_MIN_PAST_LOANS),
       },
     },
+    disbursement: {},
     logging: {
       enableTraces: process.env.GRAMCREDIT_ENABLE_TRACES !== "false",
       persistToDatabase: process.env.GRAMCREDIT_PERSIST_TRACES === "true",
@@ -261,11 +274,7 @@ export function loadGramCreditConfig(): GramCreditConfig {
       if (value === undefined) {
         return undefined;
       }
-      if (typeof value === "object" && value !== null) {
-        return Object.keys(value).some((k) => value[k] !== undefined)
-          ? value
-          : undefined;
-      }
+      // Preserve empty objects so Zod object defaults can be applied.
       return value;
     })
   );

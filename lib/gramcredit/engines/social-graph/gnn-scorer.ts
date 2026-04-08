@@ -14,9 +14,12 @@ import {
   logModuleError,
 } from "../../core/module-utils";
 import {
-  SOCIAL_GNN_MODEL_V1,
   type GraphSageModelWeights,
 } from "./model/gnn-trained-weights";
+import GENERATED_SOCIAL_GNN_MODEL from "../../../../ml/gnn/gnn-weights.generated.json";
+
+const ACTIVE_SOCIAL_GNN_MODEL =
+  GENERATED_SOCIAL_GNN_MODEL as GraphSageModelWeights;
 
 export interface GNNScoringResult {
   trustScore: number; // 0-100
@@ -353,7 +356,7 @@ async function scoreWithGNNModel(
   embedding: number[];
   anomalyScore: number;
 }> {
-  const model = SOCIAL_GNN_MODEL_V1;
+  const model = ACTIVE_SOCIAL_GNN_MODEL;
   validateModelShape(model);
 
   const nodeIndexById = new Map<string, number>();

@@ -8,8 +8,8 @@ import type {
   VoiceModuleOutput,
   OceanTraits,
 } from "../../core/types";
-import { transcribeAudio, mockTranscribeAudio } from "./transcriber";
-import { scoreOceanTraits, mockScoreOceanTraits } from "./trait-scorer";
+import { transcribeAudio } from "./transcriber";
+import { scoreOceanTraits } from "./trait-scorer";
 import { getGramCreditConfig } from "../../core/config";
 import {
   normalizeMinMax,
@@ -41,6 +41,12 @@ export async function scoreVoiceModule(
     // ========== Get Audio Input ==========
     let audioData = audioBlob;
 
+    if (mockMode) {
+      throw new Error(
+        "Voice mock mode is disabled. Provide a real audio recording.",
+      );
+    }
+
     if (!audioData && audioUrl) {
       // Fetch audio from URL if provided
       const response = await fetch(audioUrl);
@@ -62,12 +68,11 @@ export async function scoreVoiceModule(
     }
 
     // ========== Transcription ==========
-    let transcription;
-    if (mockMode) {
-      transcription = mockTranscribeAudio(audioData.length);
-    } else {
-      transcription = await transcribeAudio(audioData, logger, preferredLanguage);
-    }
+    const transcription = await transcribeAudio(
+      audioData,
+      logger,
+      preferredLanguage,
+    );
 
     if (transcription.duration > config.voice.maxAudioDuration) {
       throw new Error(
@@ -81,20 +86,12 @@ export async function scoreVoiceModule(
     });
 
     // ========== Trait Scoring ==========
-    let traitResult;
-    if (mockMode) {
-      traitResult = mockScoreOceanTraits(
-        transcription.text,
-        transcription.speechQualityScore
-      );
-    } else {
-      traitResult = await scoreOceanTraits(
-        transcription.text,
-        transcription.speechQualityScore,
-        preferredLanguage,
-        logger
-      );
-    }
+    const traitResult = await scoreOceanTraits(
+      transcription.text,
+      transcription.speechQualityScore,
+      preferredLanguage,
+      logger,
+    );
 
     // ========== Compute Final Voice Score ==========
     // Voice score is based on OCEAN profile's relevance to creditworthiness

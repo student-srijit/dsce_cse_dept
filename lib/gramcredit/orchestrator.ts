@@ -46,7 +46,8 @@ import { generateExplanation } from "./explainability/i18n-explainer";
 export async function processLoanApplication(
   request: ApplicationRequest,
 ): Promise<ApplicationResponse> {
-  const applicationId = generateApplicationId();
+  const applicationId =
+    request.metadata?.applicationId || generateApplicationId();
   const traceId = generateTraceId();
 
   const logger = createTraceLogger(applicationId, request.farmerId);
@@ -114,7 +115,11 @@ export async function processLoanApplication(
         results.forEach((result, idx) => {
           if (result.status === "rejected") {
             const signalNames = ["voice", "social", "satellite", "behavior"];
-            failures.push(`${signalNames[idx]}: ${result.reason}`);
+            const reason =
+              result.reason instanceof Error
+                ? result.reason.message
+                : String(result.reason);
+            failures.push(`${signalNames[idx]}: ${reason}`);
           }
         });
 
@@ -128,7 +133,11 @@ export async function processLoanApplication(
         // Return results or re-throw
         return results.map((result) => {
           if (result.status === "rejected") {
-            throw result.reason;
+            const reason =
+              result.reason instanceof Error
+                ? result.reason.message
+                : String(result.reason);
+            throw new Error(reason);
           }
           return result.value;
         });
@@ -240,13 +249,18 @@ export async function processLoanApplication(
       phase: "processing",
     });
 
-    // Return rejection with error
-    throw {
+    const failurePayload = {
       applicationId,
       farmerId: request.farmerId,
       timestamp: Date.now(),
       error: errorMessage,
       traceId,
     };
+
+    const wrappedError = new Error(errorMessage) as Error & {
+      payload?: typeof failurePayload;
+    };
+    wrappedError.payload = failurePayload;
+    throw wrappedError;
   }
 }

@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import {
+  ConsentKycStep,
+  type ConsentKycData,
+} from "@/components/gramcredit/consent-kyc-step";
 import { FarmerProfileForm } from "@/components/gramcredit/farmer-profile-form";
 import { VoiceRecorder } from "@/components/gramcredit/voice-recorder";
 import { DecisionCard } from "@/components/gramcredit/decision-card";
@@ -8,10 +12,13 @@ import { ExplanationCard } from "@/components/gramcredit/explanation-card";
 import { Spinner } from "@/components/ui/spinner";
 
 interface ApplicationStep {
-  phase: "profile" | "voice" | "processing" | "result";
+  phase: "consent" | "profile" | "voice" | "processing" | "result";
 }
 
 interface ApplicationResult {
+  applicationId: string;
+  farmerId: string;
+  timestamp: number;
   decision: {
     decision: "APPROVED" | "REJECTED" | "UNDER_REVIEW";
     gramScore: number;
@@ -52,12 +59,39 @@ interface ApplicationResult {
   }>;
 }
 
+interface ApplicationStatusRecord {
+  applicationId: string;
+  farmerId: string;
+  status:
+    | "RECEIVED"
+    | "PROCESSING"
+    | "UNDER_REVIEW"
+    | "REVIEW_IN_PROGRESS"
+    | "COMPLETED"
+    | "FAILED";
+  createdAt: number;
+  updatedAt: number;
+  decision?: "APPROVED" | "REJECTED" | "UNDER_REVIEW";
+  reason?: string;
+}
+
 interface FarmerProfile {
   name: string;
   age: number;
+  gender: "male" | "female" | "other";
+  mobileNumber: string;
   state: string;
+  village: string;
   cropType: string;
   landSizeHectares: number;
+  yearsFarming: number;
+  annualIncome: number;
+  hasIrrigation: boolean;
+  hasStorage: boolean;
+  pastLoanCount: number;
+  landOwnershipType: "owned" | "leased" | "shared";
+  requestedLoanAmount: number;
+  loanPurpose: string;
   location: {
     lat: number;
     lon: number;
@@ -114,13 +148,23 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 export default function TryPage() {
-  const [step, setStep] = useState<ApplicationStep>({ phase: "profile" });
+  const [step, setStep] = useState<ApplicationStep>({ phase: "consent" });
+  const [consentKyc, setConsentKyc] = useState<ConsentKycData | null>(null);
   const [farmerProfile, setFarmerProfile] = useState<FarmerProfile | null>(
     null,
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [isStatusLoading, setIsStatusLoading] = useState(false);
   const [result, setResult] = useState<ApplicationResult | null>(null);
+  const [statusRecord, setStatusRecord] =
+    useState<ApplicationStatusRecord | null>(null);
   const [error, setError] = useState<string>("");
+
+  const handleConsentSubmit = (payload: ConsentKycData) => {
+    setConsentKyc(payload);
+    setStep({ phase: "profile" });
+    setError("");
+  };
 
   const handleProfileSubmit = (profile: FarmerProfile) => {
     setFarmerProfile(profile);
@@ -131,7 +175,13 @@ export default function TryPage() {
   const handleRecordingComplete = async (blob: Blob) => {
     if (!farmerProfile) {
       setError("Farmer profile is missing. Please start again.");
-      setStep({ phase: "profile" });
+      setStep({ phase: "consent" });
+      return;
+    }
+
+    if (!consentKyc) {
+      setError("Consent and KYC details are missing. Please start again.");
+      setStep({ phase: "consent" });
       return;
     }
 
@@ -151,7 +201,10 @@ export default function TryPage() {
           farmerId: `farmer_${Date.now()}`,
           audioBlob: base64Audio,
           farmerProfile,
-          requestedLoanAmount: 50000,
+          requestedLoanAmount: farmerProfile.requestedLoanAmount,
+          loanPurpose: farmerProfile.loanPurpose,
+          consent: consentKyc.consent,
+          kyc: consentKyc.kyc,
         }),
       });
 
@@ -167,6 +220,7 @@ export default function TryPage() {
 
       const applicationResult: ApplicationResult = await response.json();
       setResult(applicationResult);
+      setStatusRecord(null);
       setStep({ phase: "result" });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -178,10 +232,39 @@ export default function TryPage() {
   };
 
   const handleReset = () => {
-    setStep({ phase: "profile" });
+    setStep({ phase: "consent" });
+    setConsentKyc(null);
     setFarmerProfile(null);
     setResult(null);
+    setStatusRecord(null);
     setError("");
+  };
+
+  const refreshApplicationStatus = async () => {
+    if (!result?.applicationId) {
+      return;
+    }
+
+    setIsStatusLoading(true);
+    try {
+      const response = await fetch(
+        `/api/gramcredit/status/${result.applicationId}`,
+      );
+      if (!response.ok) {
+        throw new Error("Unable to fetch application status");
+      }
+
+      const statusPayload: ApplicationStatusRecord = await response.json();
+      setStatusRecord(statusPayload);
+    } catch (statusError) {
+      const message =
+        statusError instanceof Error
+          ? statusError.message
+          : "Unable to fetch application status";
+      setError(message);
+    } finally {
+      setIsStatusLoading(false);
+    }
   };
 
   const selectedLanguage = farmerProfile?.preferredLanguage || "en";
@@ -239,23 +322,33 @@ export default function TryPage() {
 
         <div className="flex items-center justify-center gap-2 text-sm">
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center ${step.phase !== "profile" ? "bg-green-600 text-white" : "bg-blue-600 text-white"}`}
+            className={`w-8 h-8 rounded-full flex items-center justify-center ${step.phase !== "consent" ? "bg-green-600 text-white" : "bg-blue-600 text-white"}`}
           >
             1
           </div>
           <div className="w-8 h-1 bg-gray-300" />
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center ${step.phase !== "voice" && step.phase !== "profile" ? "bg-green-600 text-white" : step.phase === "voice" ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"}`}
+            className={`w-8 h-8 rounded-full flex items-center justify-center ${step.phase === "voice" || step.phase === "processing" || step.phase === "result" ? "bg-green-600 text-white" : step.phase === "profile" ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"}`}
           >
             2
           </div>
           <div className="w-8 h-1 bg-gray-300" />
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center ${step.phase === "result" ? "bg-green-600 text-white" : step.phase === "processing" ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"}`}
+            className={`w-8 h-8 rounded-full flex items-center justify-center ${step.phase === "processing" || step.phase === "result" ? "bg-green-600 text-white" : step.phase === "voice" ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"}`}
           >
             3
           </div>
+          <div className="w-8 h-1 bg-gray-300" />
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center ${step.phase === "result" ? "bg-green-600 text-white" : step.phase === "processing" ? "bg-blue-600 text-white" : "bg-gray-300 text-gray-600"}`}
+          >
+            4
+          </div>
         </div>
+
+        {step.phase === "consent" && (
+          <ConsentKycStep onSubmit={handleConsentSubmit} isLoading={isLoading} />
+        )}
 
         {step.phase === "profile" && (
           <FarmerProfileForm
@@ -362,6 +455,36 @@ export default function TryPage() {
             >
               Start New Application
             </button>
+
+            <p className="text-xs text-center text-muted-foreground">
+              Application ID: {result.applicationId}
+            </p>
+
+            <button
+              onClick={refreshApplicationStatus}
+              className="w-full px-4 py-2 bg-white text-foreground border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              disabled={isStatusLoading}
+            >
+              {isStatusLoading ? "Checking status..." : "Check Application Status"}
+            </button>
+
+            {statusRecord && (
+              <div className="p-4 bg-white rounded-lg border border-gray-200">
+                <p className="text-sm font-semibold text-foreground">
+                  Current Status: {statusRecord.status}
+                </p>
+                {statusRecord.decision && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Decision: {statusRecord.decision}
+                  </p>
+                )}
+                {statusRecord.reason && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Reason: {statusRecord.reason}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

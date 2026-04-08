@@ -206,6 +206,7 @@ export interface FarmerProfile {
   farmerId: string;
   name: string;
   age: number;
+  gender?: "male" | "female" | "other";
   location: {
     latitude: number;
     longitude: number;
@@ -215,7 +216,26 @@ export interface FarmerProfile {
   cropType: string;
   landSizeAcres: number;
   mobileNumber?: string;
+  yearsFarming?: number;
+  annualIncome?: number;
+  hasIrrigation?: boolean;
+  hasStorage?: boolean;
+  pastLoanCount?: number;
+  landOwnershipType?: "owned" | "leased" | "shared";
   preferredLanguage: "en" | "hi" | "ta" | "te" | "kn";
+}
+
+export interface ConsentInfo {
+  termsAccepted: boolean;
+  dataProcessingAccepted: boolean;
+  policyVersion: string;
+  acceptedAt: number;
+}
+
+export interface KycInfo {
+  idType: "aadhaar" | "pan" | "voter_id" | "driving_license";
+  idNumberMasked: string;
+  verified: boolean;
 }
 
 export interface LoanRequest {
@@ -229,13 +249,42 @@ export interface ApplicationRequest {
   farmerId: string;
   farmerProfile: FarmerProfile;
   loanRequest: LoanRequest;
+  consent?: ConsentInfo;
+  kyc?: KycInfo;
   audioBlob?: string; // base64 encoded WAV/WebM
   audioUrl?: string; // alternative: pre-recorded URL
   metadata?: {
     deviceId?: string;
     timestamp?: number;
     ipAddress?: string;
+    applicationId?: string;
   };
+}
+
+export type ApplicationStatus =
+  | "RECEIVED"
+  | "PROCESSING"
+  | "UNDER_REVIEW"
+  | "REVIEW_IN_PROGRESS"
+  | "COMPLETED"
+  | "FAILED";
+
+export interface ApplicationReviewEvent {
+  at: number;
+  reviewer: string;
+  note: string;
+  action: "MARK_UNDER_REVIEW" | "APPROVE" | "REJECT";
+}
+
+export interface ApplicationStatusRecord {
+  applicationId: string;
+  farmerId: string;
+  status: ApplicationStatus;
+  createdAt: number;
+  updatedAt: number;
+  decision?: DecisionOutput["decision"];
+  reason?: string;
+  reviewHistory?: ApplicationReviewEvent[];
 }
 
 export interface ApplicationResponse {
@@ -274,6 +323,8 @@ export interface GramCreditConfig {
     transactionThresholdDays: number;
     minClusterSize: number;
     trustNormalization: "minmax" | "zscore";
+    connectorUrl?: string;
+    connectorApiKey?: string;
   };
   satellite: {
     sentinelHubClientId?: string;
@@ -285,8 +336,10 @@ export interface GramCreditConfig {
       critical: number;
     };
     anomalyDetectionSensitivity: number;
-    defaultProvider: "sentinel" | "bhuvan" | "mock";
+    defaultProvider: "sentinel" | "bhuvan";
     imageSearchWindowDays: number;
+    connectorUrl?: string;
+    connectorApiKey?: string;
   };
   behavior: {
     consistencyWindowDays: number;
@@ -294,6 +347,8 @@ export interface GramCreditConfig {
     rechargeRegularityWeight: number;
     transactionFrequencyWeight: number;
     anomalyThreshold: number;
+    connectorUrl?: string;
+    connectorApiKey?: string;
   };
   fusion: {
     weights: SignalWeights;

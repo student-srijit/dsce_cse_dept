@@ -8,9 +8,7 @@ import type { BehaviorModuleOutput, BehaviorMetrics } from "../../core/types";
 import { getGramCreditConfig } from "../../core/config";
 import {
   validateScore,
-  validateConfidence,
   createErrorOutput,
-  normalizeMinMax,
   logModuleProcessing,
 } from "../../core/module-utils";
 
@@ -52,10 +50,14 @@ export async function scoreBehaviorSignalModule(
     if (customData) {
       behaviorData = customData;
     } else if (mockMode) {
-      behaviorData = generateMockBehaviorData(farmerId);
+      throw new Error(
+        "Behavior mock mode is disabled. Provide real transaction/recharge data.",
+      );
     } else {
-      // In production, fetch from real UPI/mobile providers
-      behaviorData = generateMockBehaviorData(farmerId);
+      behaviorData = await fetchBehaviorSignalData(
+        farmerId,
+        config.behavior.consistencyWindowDays,
+      );
     }
 
     if (
@@ -172,7 +174,7 @@ export async function scoreBehaviorSignalModule(
       "behavior_signal",
       error instanceof Error ? error.message : String(error),
       "BEHAVIOR_PROCESSING_ERROR",
-      50, // Neutral on error
+      0,
       {}
     );
   }
@@ -372,6 +374,139 @@ function detectAnomalies(
   return false;
 }
 
+async function fetchBehaviorSignalData(
+  farmerId: string,
+  analysisWindowDays: number,
+): Promise<BehaviorSignalData> {
+  const config = getGramCreditConfig();
+  const connectorUrl = config.behavior.connectorUrl;
+
+  if (!connectorUrl) {
+    throw new Error(
+      "GRAMCREDIT_BEHAVIOR_CONNECTOR_URL is required for real behavior scoring.",
+    );
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (config.behavior.connectorApiKey) {
+    headers["x-api-key"] = config.behavior.connectorApiKey;
+  }
+
+  const response = await fetch(connectorUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      farmerId,
+      analysisWindowDays,
+    }),
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(
+      `Behavior connector request failed (${response.status}): ${responseText.slice(0, 300)}`,
+    );
+  }
+
+  const payload = await response.json();
+  return parseBehaviorSignalData(payload, analysisWindowDays);
+}
+
+function parseBehaviorSignalData(
+  payload: unknown,
+  analysisWindowDays: number,
+): BehaviorSignalData {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Behavior connector response must be a JSON object.");
+  }
+
+  const source = payload as {
+    upiTransactions?: unknown;
+    recharges?: unknown;
+  };
+
+  if (!Array.isArray(source.upiTransactions)) {
+    throw new Error("Behavior connector response missing 'upiTransactions' array.");
+  }
+  if (!Array.isArray(source.recharges)) {
+    throw new Error("Behavior connector response missing 'recharges' array.");
+  }
+
+  return {
+    upiTransactions: source.upiTransactions.map(parseUpiTransaction),
+    recharges: source.recharges.map(parseRecharge),
+    analysisWindow: analysisWindowDays,
+  };
+}
+
+function parseUpiTransaction(value: unknown): {
+  date: Date;
+  amount: number;
+  type: "credit" | "debit";
+} {
+  if (!value || typeof value !== "object") {
+    throw new Error("Invalid UPI transaction entry: expected object.");
+  }
+
+  const source = value as {
+    date?: unknown;
+    amount?: unknown;
+    type?: unknown;
+  };
+  const date = parseDate(source.date, "upiTransactions[].date");
+  const amount = parseFiniteNumber(source.amount, "upiTransactions[].amount");
+
+  if (source.type !== "credit" && source.type !== "debit") {
+    throw new Error(
+      "Invalid upiTransactions[].type: expected 'credit' or 'debit'.",
+    );
+  }
+
+  return {
+    date,
+    amount,
+    type: source.type,
+  };
+}
+
+function parseRecharge(value: unknown): { date: Date; amount: number } {
+  if (!value || typeof value !== "object") {
+    throw new Error("Invalid recharge entry: expected object.");
+  }
+
+  const source = value as {
+    date?: unknown;
+    amount?: unknown;
+  };
+
+  return {
+    date: parseDate(source.date, "recharges[].date"),
+    amount: parseFiniteNumber(source.amount, "recharges[].amount"),
+  };
+}
+
+function parseDate(value: unknown, fieldName: string): Date {
+  if (typeof value !== "string" && typeof value !== "number") {
+    throw new Error(`Invalid ${fieldName}: expected string or number timestamp.`);
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Invalid ${fieldName}: invalid date value.`);
+  }
+  return parsed;
+}
+
+function parseFiniteNumber(value: unknown, fieldName: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`Invalid ${fieldName}: expected finite number.`);
+  }
+  return value;
+}
+
 // ========== Discipline Score Computation ==========
 
 function computeDisciplineScore(
@@ -451,46 +586,6 @@ function generateReasonCode(score: number, anomalyDetected: boolean): string {
   } else {
     return "BEHAVIOR_POOR_DISCIPLINE";
   }
-}
-
-// ========== Mock Data Generation ==========
-
-function generateMockBehaviorData(farmerId: string): BehaviorSignalData {
-  const now = new Date();
-  const windowDays = 90;
-
-  // Generate ~15-25 UPI transactions
-  const upiTransactions = [];
-  for (let i = 0; i < 15 + Math.floor(Math.random() * 10); i++) {
-    const daysAgo = Math.floor(Math.random() * windowDays);
-    const date = new Date(now);
-    date.setDate(date.getDate() - daysAgo);
-
-    upiTransactions.push({
-      date,
-      amount: 500 + Math.floor(Math.random() * 5000),
-      type: Math.random() > 0.5 ? "credit" : "debit",
-    });
-  }
-
-  // Generate ~6-10 recharges
-  const recharges = [];
-  for (let i = 0; i < 6 + Math.floor(Math.random() * 4); i++) {
-    const daysAgo = Math.floor(Math.random() * windowDays);
-    const date = new Date(now);
-    date.setDate(date.getDate() - daysAgo);
-
-    recharges.push({
-      date,
-      amount: 100 + Math.floor(Math.random() * 500),
-    });
-  }
-
-  return {
-    upiTransactions,
-    recharges,
-    analysisWindow: windowDays,
-  };
 }
 
 export type { BehaviorMetrics };

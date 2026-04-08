@@ -83,6 +83,16 @@ export async function makeDecision(
       lowConfidenceSignals.push("behavior");
     }
 
+    if (signalConfidences.voice <= 0) {
+      decision = "UNDER_REVIEW";
+      reasonCodes.push("VOICE_SIGNAL_UNAVAILABLE");
+      logger.logValidation(
+        "decision_engine",
+        false,
+        "Voice signal unavailable for reliable underwriting",
+      );
+    }
+
     if (lowConfidenceSignals.length > 1) {
       decision = "UNDER_REVIEW";
       reasonCodes.push(`LOW_CONFIDENCE_SIGNALS_${lowConfidenceSignals.length}`);
@@ -103,9 +113,15 @@ export async function makeDecision(
 
       loanCategory = categoryResult.category;
       if (categoryResult.category !== "NONE") {
-        decision = "APPROVED";
         reasonCodes.push(categoryResult.reasonCode);
-        approvedAmount = categoryResult.amount;
+
+        if (decision === "UNDER_REVIEW") {
+          approvedAmount = 0;
+          reasonCodes.push("REQUIRES_MANUAL_REVIEW");
+        } else {
+          decision = "APPROVED";
+          approvedAmount = categoryResult.amount;
+        }
 
         logger.logProcessing("decision_engine", "loan_category_assigned", {
           category: loanCategory,

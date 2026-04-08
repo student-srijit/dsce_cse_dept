@@ -11,12 +11,14 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceRecorderProps) {
+  const minDurationSeconds = 15;
   const [isRecording, setIsRecording] = useState(false);
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string>("");
+  const [recordingDurationSeconds, setRecordingDurationSeconds] = useState(0);
   const [error, setError] = useState<string>("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
@@ -48,6 +50,23 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunks, { type: "audio/webm" });
+        const elapsedMs = recordingStartedAtRef.current
+          ? Date.now() - recordingStartedAtRef.current
+          : 0;
+        const elapsedSeconds = Math.max(0, Math.round(elapsedMs / 1000));
+
+        setRecordingDurationSeconds(elapsedSeconds);
+
+        if (elapsedSeconds < minDurationSeconds) {
+          setError(
+            `Please record for at least ${minDurationSeconds} seconds for reliable analysis.`,
+          );
+          setRecordedAudio(null);
+          setAudioUrl("");
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
         setRecordedAudio(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
@@ -57,6 +76,7 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
       };
 
       mediaRecorder.start();
+      recordingStartedAtRef.current = Date.now();
       setIsRecording(true);
     } catch (err) {
       setError("Failed to access microphone. Please check permissions.");
@@ -83,6 +103,7 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
     }
     setRecordedAudio(null);
     setAudioUrl("");
+    setRecordingDurationSeconds(0);
   };
 
   return (
@@ -127,7 +148,7 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
             <div className="p-3 bg-green-50 border border-green-200 rounded-md">
               <p className="text-sm text-green-700 font-medium">Recording captured</p>
               <p className="text-xs text-green-600 mt-1">
-                Duration: {(recordedAudio.size / 1024).toFixed(1)} KB
+                Duration: {recordingDurationSeconds}s | Size: {(recordedAudio.size / 1024).toFixed(1)} KB
               </p>
             </div>
             <audio src={audioUrl} controls className="w-full h-8" />

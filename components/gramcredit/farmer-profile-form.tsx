@@ -17,9 +17,20 @@ import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
 interface FarmerProfile {
   name: string;
   age: number;
+  gender: "male" | "female" | "other";
+  mobileNumber: string;
   state: string;
+  village: string;
   cropType: string;
   landSizeHectares: number;
+  yearsFarming: number;
+  annualIncome: number;
+  hasIrrigation: boolean;
+  hasStorage: boolean;
+  pastLoanCount: number;
+  landOwnershipType: "owned" | "leased" | "shared";
+  requestedLoanAmount: number;
+  loanPurpose: string;
   location: {
     lat: number;
     lon: number;
@@ -88,9 +99,20 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
   const [formData, setFormData] = useState<FarmerProfile>({
     name: "",
     age: 35,
+    gender: "male",
+    mobileNumber: "",
     state: "Maharashtra",
+    village: "",
     cropType: "wheat",
     landSizeHectares: 1.5,
+    yearsFarming: 8,
+    annualIncome: 180000,
+    hasIrrigation: true,
+    hasStorage: false,
+    pastLoanCount: 0,
+    landOwnershipType: "owned",
+    requestedLoanAmount: 50000,
+    loanPurpose: "Seasonal crop working capital",
     location: {
       lat: 20.5937,
       lon: 78.9629,
@@ -106,11 +128,31 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
     }
+    if (!formData.mobileNumber.trim()) {
+      newErrors.mobileNumber = "Mobile number is required";
+    } else if (!/^\d{10}$/.test(formData.mobileNumber.trim())) {
+      newErrors.mobileNumber = "Mobile number must be 10 digits";
+    }
+    if (!formData.village.trim()) {
+      newErrors.village = "Village is required";
+    }
     if (formData.age < 18 || formData.age > 100) {
       newErrors.age = "Age must be between 18 and 100";
     }
     if (formData.landSizeHectares <= 0 || formData.landSizeHectares > 100) {
       newErrors.landSize = "Land size must be between 0.1 and 100 hectares";
+    }
+    if (formData.yearsFarming < 0 || formData.yearsFarming > 80) {
+      newErrors.yearsFarming = "Years farming must be between 0 and 80";
+    }
+    if (formData.annualIncome <= 0) {
+      newErrors.annualIncome = "Annual income must be greater than 0";
+    }
+    if (formData.requestedLoanAmount <= 0) {
+      newErrors.requestedLoanAmount = "Requested amount must be greater than 0";
+    }
+    if (!formData.loanPurpose.trim()) {
+      newErrors.loanPurpose = "Loan purpose is required";
     }
 
     setErrors(newErrors);
@@ -166,6 +208,48 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
 
         <FieldGroup>
           <Field>
+            <FieldLabel>Gender</FieldLabel>
+            <Select
+              value={formData.gender}
+              onValueChange={(value) =>
+                setFormData({
+                  ...formData,
+                  gender: value as "male" | "female" | "other",
+                })
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field>
+            <FieldLabel>Mobile Number</FieldLabel>
+            <Input
+              type="tel"
+              placeholder="10-digit mobile number"
+              value={formData.mobileNumber}
+              onChange={(e) =>
+                setFormData({ ...formData, mobileNumber: e.target.value })
+              }
+              disabled={isLoading}
+              maxLength={10}
+            />
+            {errors.mobileNumber && (
+              <p className="text-sm text-red-600 mt-1">{errors.mobileNumber}</p>
+            )}
+          </Field>
+        </FieldGroup>
+
+        <FieldGroup>
+          <Field>
             <FieldLabel>State</FieldLabel>
             <Select
               value={formData.state}
@@ -185,6 +269,22 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
                 ))}
               </SelectContent>
             </Select>
+          </Field>
+
+          <Field>
+            <FieldLabel>Village</FieldLabel>
+            <Input
+              type="text"
+              placeholder="Village name"
+              value={formData.village}
+              onChange={(e) =>
+                setFormData({ ...formData, village: e.target.value })
+              }
+              disabled={isLoading}
+            />
+            {errors.village && (
+              <p className="text-sm text-red-600 mt-1">{errors.village}</p>
+            )}
           </Field>
 
           <Field>
@@ -255,6 +355,164 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
             />
             {errors.landSize && (
               <p className="text-sm text-red-600 mt-1">{errors.landSize}</p>
+            )}
+          </Field>
+        </FieldGroup>
+
+        <FieldGroup>
+          <Field>
+            <FieldLabel>Years of Farming Experience</FieldLabel>
+            <Input
+              type="number"
+              value={formData.yearsFarming}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  yearsFarming: parseInt(e.target.value, 10) || 0,
+                })
+              }
+              disabled={isLoading}
+              min="0"
+              max="80"
+            />
+            {errors.yearsFarming && (
+              <p className="text-sm text-red-600 mt-1">{errors.yearsFarming}</p>
+            )}
+          </Field>
+
+          <Field>
+            <FieldLabel>Annual Income (INR)</FieldLabel>
+            <Input
+              type="number"
+              value={formData.annualIncome}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  annualIncome: parseFloat(e.target.value) || 0,
+                })
+              }
+              disabled={isLoading}
+              min="0"
+            />
+            {errors.annualIncome && (
+              <p className="text-sm text-red-600 mt-1">{errors.annualIncome}</p>
+            )}
+          </Field>
+        </FieldGroup>
+
+        <FieldGroup>
+          <Field>
+            <FieldLabel>Land Ownership Type</FieldLabel>
+            <Select
+              value={formData.landOwnershipType}
+              onValueChange={(value) =>
+                setFormData({
+                  ...formData,
+                  landOwnershipType: value as "owned" | "leased" | "shared",
+                })
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="owned">Owned</SelectItem>
+                <SelectItem value="leased">Leased</SelectItem>
+                <SelectItem value="shared">Shared</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field>
+            <FieldLabel>Past Formal Loan Count</FieldLabel>
+            <Input
+              type="number"
+              value={formData.pastLoanCount}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  pastLoanCount: Math.max(0, parseInt(e.target.value, 10) || 0),
+                })
+              }
+              disabled={isLoading}
+              min="0"
+            />
+          </Field>
+        </FieldGroup>
+
+        <FieldGroup>
+          <Field>
+            <FieldLabel>Irrigation Access</FieldLabel>
+            <Select
+              value={formData.hasIrrigation ? "yes" : "no"}
+              onValueChange={(value) =>
+                setFormData({ ...formData, hasIrrigation: value === "yes" })
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field>
+            <FieldLabel>Storage Availability</FieldLabel>
+            <Select
+              value={formData.hasStorage ? "yes" : "no"}
+              onValueChange={(value) =>
+                setFormData({ ...formData, hasStorage: value === "yes" })
+              }
+              disabled={isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        </FieldGroup>
+
+        <FieldGroup>
+          <Field>
+            <FieldLabel>Requested Loan Amount (INR)</FieldLabel>
+            <Input
+              type="number"
+              value={formData.requestedLoanAmount}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  requestedLoanAmount: parseFloat(e.target.value) || 0,
+                })
+              }
+              disabled={isLoading}
+              min="1000"
+            />
+            {errors.requestedLoanAmount && (
+              <p className="text-sm text-red-600 mt-1">{errors.requestedLoanAmount}</p>
+            )}
+          </Field>
+
+          <Field>
+            <FieldLabel>Loan Purpose</FieldLabel>
+            <Input
+              type="text"
+              value={formData.loanPurpose}
+              onChange={(e) =>
+                setFormData({ ...formData, loanPurpose: e.target.value })
+              }
+              disabled={isLoading}
+            />
+            {errors.loanPurpose && (
+              <p className="text-sm text-red-600 mt-1">{errors.loanPurpose}</p>
             )}
           </Field>
         </FieldGroup>

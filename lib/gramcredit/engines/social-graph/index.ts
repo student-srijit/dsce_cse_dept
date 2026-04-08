@@ -4,16 +4,23 @@
  */
 
 import { GramCreditTraceLogger } from "../../core/trace-logger";
-import type { SocialGraphModuleOutput } from "../../core/types";
+import type {
+  SocialGraphModuleOutput,
+  SocialGraphNode,
+  SocialGraphEdge,
+} from "../../core/types";
 import { scoreGNNTrust } from "./gnn-scorer";
-import { getMockSocialNetwork, getMockTransactionHistory } from "./mock-data";
 import { getGramCreditConfig } from "../../core/config";
 import {
   validateScore,
-  validateConfidence,
   createErrorOutput,
   logModuleProcessing,
 } from "../../core/module-utils";
+
+interface SocialNetworkData {
+  nodes: SocialGraphNode[];
+  edges: SocialGraphEdge[];
+}
 
 /**
  * Score social trust from UPI/SHG network
@@ -38,24 +45,21 @@ export async function scoreSocialGraphModule(
     });
 
     // ========== Get Network Data ==========
-    let network;
-
     if (mockMode) {
-      // Use mock data
-      network = getMockSocialNetwork(farmerId);
-      logModuleProcessing(logger, "social_graph", "network_loaded_mock", {
-        nodeCount: network.nodes.length,
-        edgeCount: network.edges.length,
-      });
-    } else {
-      // In production, fetch from real UPI/SHG databases
-      // For now, fall back to mock
-      network = getMockSocialNetwork(farmerId);
-      logModuleProcessing(logger, "social_graph", "network_loaded_real", {
-        nodeCount: network.nodes.length,
-        edgeCount: network.edges.length,
-      });
+      throw new Error(
+        "Social graph mock mode is disabled. Provide a real UPI/SHG data source.",
+      );
     }
+
+    const network = await fetchRealSocialGraphNetwork(
+      farmerId,
+      config.socialGraph.transactionThresholdDays,
+    );
+
+    logModuleProcessing(logger, "social_graph", "network_loaded_real", {
+      nodeCount: network.nodes.length,
+      edgeCount: network.edges.length,
+    });
 
     if (network.nodes.length === 0) {
       return createErrorOutput(
@@ -143,6 +147,153 @@ export async function scoreSocialGraphModule(
   }
 }
 
+async function fetchRealSocialGraphNetwork(
+  farmerId: string,
+  transactionWindowDays: number,
+): Promise<SocialNetworkData> {
+  const config = getGramCreditConfig();
+  const connectorUrl = config.socialGraph.connectorUrl;
+
+  if (!connectorUrl) {
+    throw new Error(
+      "GRAMCREDIT_SOCIAL_CONNECTOR_URL is required for real social graph scoring.",
+    );
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (config.socialGraph.connectorApiKey) {
+    headers["x-api-key"] = config.socialGraph.connectorApiKey;
+  }
+
+  const response = await fetch(connectorUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      farmerId,
+      transactionWindowDays,
+    }),
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(
+      `Social connector request failed (${response.status}): ${responseText.slice(0, 300)}`,
+    );
+  }
+
+  const payload = await response.json();
+  return parseSocialNetworkData(payload);
+}
+
+function parseSocialNetworkData(payload: unknown): SocialNetworkData {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Social connector response must be a JSON object.");
+  }
+
+  const nodesRaw = (payload as { nodes?: unknown }).nodes;
+  const edgesRaw = (payload as { edges?: unknown }).edges;
+
+  if (!Array.isArray(nodesRaw)) {
+    throw new Error("Social connector response missing 'nodes' array.");
+  }
+  if (!Array.isArray(edgesRaw)) {
+    throw new Error("Social connector response missing 'edges' array.");
+  }
+
+  return {
+    nodes: nodesRaw.map(parseSocialNode),
+    edges: edgesRaw.map(parseSocialEdge),
+  };
+}
+
+function parseSocialNode(node: unknown): SocialGraphNode {
+  if (!node || typeof node !== "object") {
+    throw new Error("Invalid social node: expected object.");
+  }
+
+  const source = node as {
+    farmerId?: unknown;
+    transactionVolume?: unknown;
+    transactionFrequency?: unknown;
+    repaymentHistory?: {
+      onTimePayments?: unknown;
+      latePayments?: unknown;
+      defaultedPayments?: unknown;
+    };
+  };
+
+  const farmerId = asNonEmptyString(source.farmerId, "node.farmerId");
+  const transactionVolume = asFiniteNumber(
+    source.transactionVolume,
+    "node.transactionVolume",
+  );
+  const transactionFrequency = asFiniteNumber(
+    source.transactionFrequency,
+    "node.transactionFrequency",
+  );
+
+  if (!source.repaymentHistory || typeof source.repaymentHistory !== "object") {
+    throw new Error("Invalid social node: missing repaymentHistory.");
+  }
+
+  return {
+    farmerId,
+    transactionVolume,
+    transactionFrequency,
+    repaymentHistory: {
+      onTimePayments: asFiniteNumber(
+        source.repaymentHistory.onTimePayments,
+        "node.repaymentHistory.onTimePayments",
+      ),
+      latePayments: asFiniteNumber(
+        source.repaymentHistory.latePayments,
+        "node.repaymentHistory.latePayments",
+      ),
+      defaultedPayments: asFiniteNumber(
+        source.repaymentHistory.defaultedPayments,
+        "node.repaymentHistory.defaultedPayments",
+      ),
+    },
+  };
+}
+
+function parseSocialEdge(edge: unknown): SocialGraphEdge {
+  if (!edge || typeof edge !== "object") {
+    throw new Error("Invalid social edge: expected object.");
+  }
+
+  const source = edge as {
+    source?: unknown;
+    target?: unknown;
+    weight?: unknown;
+    frequency?: unknown;
+  };
+
+  return {
+    source: asNonEmptyString(source.source, "edge.source"),
+    target: asNonEmptyString(source.target, "edge.target"),
+    weight: asFiniteNumber(source.weight, "edge.weight"),
+    frequency: asFiniteNumber(source.frequency, "edge.frequency"),
+  };
+}
+
+function asNonEmptyString(value: unknown, fieldName: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Invalid ${fieldName}: expected non-empty string.`);
+  }
+  return value.trim();
+}
+
+function asFiniteNumber(value: unknown, fieldName: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`Invalid ${fieldName}: expected finite number.`);
+  }
+  return value;
+}
+
 /**
  * Compute creditworthiness score from social graph metrics
  * Weights trustworthiness and network integration
@@ -173,4 +324,3 @@ function computeSocialScore(gnnResult: {
   return validateScore(score, 0, 100, 50);
 }
 
-export { getMockSocialNetwork, getMockTransactionHistory };

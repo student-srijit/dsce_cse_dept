@@ -20,7 +20,7 @@ export interface SatelliteData {
   ndvi: number; // -1 to 1
   cloudCover: number; // 0-100
   imageDate: string; // ISO date
-  source: "sentinel" | "bhuvan" | "mock";
+  source: "sentinel" | "bhuvan";
 }
 
 /**
@@ -46,26 +46,17 @@ export async function scoreSatelliteCropModule(
     });
 
     // ========== Fetch Satellite Data ==========
-    let satelliteData: SatelliteData;
-
     if (mockMode) {
-      satelliteData = generateMockSatelliteData(cropType);
-    } else {
-      try {
-        satelliteData = await fetchSatelliteData(
-          location,
-          cropType,
-          config.satellite.defaultProvider
-        );
-      } catch (error) {
-        moduleLogger.logProcessing("satellite_crop", "fetch_failed_fallback", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Fall back to mock data
-        satelliteData = generateMockSatelliteData(cropType);
-        satelliteData.source = "mock";
-      }
+      throw new Error(
+        "Satellite mock mode is disabled. Configure a real satellite provider.",
+      );
     }
+
+    const satelliteData = await fetchSatelliteData(
+      location,
+      cropType,
+      config.satellite.defaultProvider
+    );
 
     moduleLogger.logProcessing("satellite_crop", "data_fetched", {
       source: satelliteData.source,
@@ -195,7 +186,7 @@ export async function scoreSatelliteCropModule(
       "satellite_crop",
       error instanceof Error ? error.message : String(error),
       "SATELLITE_PROCESSING_ERROR",
-      50, // Neutral score on error
+      0,
       {}
     );
   }
@@ -209,15 +200,13 @@ export async function scoreSatelliteCropModule(
 async function fetchSatelliteData(
   location: { latitude: number; longitude: number },
   cropType: string,
-  provider: "sentinel" | "bhuvan" | "mock"
+  provider: "sentinel" | "bhuvan",
 ): Promise<SatelliteData> {
   if (provider === "sentinel") {
-    return fetchSentinel2Data(location);
-  } else if (provider === "bhuvan") {
-    return fetchBhuvanData(location);
-  } else {
-    return generateMockSatelliteData(cropType);
+    return fetchSentinel2Data(location, cropType);
   }
+
+  return fetchBhuvanData(location, cropType);
 }
 
 /**
@@ -226,19 +215,22 @@ async function fetchSatelliteData(
 async function fetchSentinel2Data(location: {
   latitude: number;
   longitude: number;
-}): Promise<SatelliteData> {
+}, cropType: string): Promise<SatelliteData> {
   const config = getGramCreditConfig();
 
-  if (
-    !config.satellite.sentinelHubClientId ||
-    !config.satellite.sentinelHubSecret
-  ) {
-    throw new Error("Sentinel Hub credentials not configured");
+  if (!config.satellite.connectorUrl) {
+    throw new Error(
+      "GRAMCREDIT_SATELLITE_CONNECTOR_URL is required when using sentinel provider.",
+    );
   }
 
-  // TODO: Implement actual Sentinel Hub API call
-  // For now, return mock
-  return generateMockSatelliteData("wheat");
+  return fetchSatelliteFromConnector(
+    config.satellite.connectorUrl,
+    config.satellite.connectorApiKey,
+    location,
+    cropType,
+    "sentinel",
+  );
 }
 
 /**
@@ -247,43 +239,111 @@ async function fetchSentinel2Data(location: {
 async function fetchBhuvanData(location: {
   latitude: number;
   longitude: number;
-}): Promise<SatelliteData> {
+}, cropType: string): Promise<SatelliteData> {
   const config = getGramCreditConfig();
 
-  if (!config.satellite.bhuvanApiKey) {
-    throw new Error("Bhuvan API key not configured");
+  if (!config.satellite.connectorUrl) {
+    throw new Error(
+      "GRAMCREDIT_SATELLITE_CONNECTOR_URL is required when using bhuvan provider.",
+    );
   }
 
-  // TODO: Implement actual Bhuvan API call
-  // ISRO Bhuvan NDVI products: https://bhuvan-nrsc.gov.in
-  // For now, return mock
-  return generateMockSatelliteData("wheat");
+  return fetchSatelliteFromConnector(
+    config.satellite.connectorUrl,
+    config.satellite.connectorApiKey,
+    location,
+    cropType,
+    "bhuvan",
+  );
 }
 
-// ========== Mock Data & Baselines ==========
-
-/**
- * Generate realistic mock satellite data
- */
-function generateMockSatelliteData(cropType: string): SatelliteData {
-  // Realistic NDVI ranges by crop type
-  const ndviRanges: Record<string, [number, number]> = {
-    wheat: [0.4, 0.75],
-    rice: [0.5, 0.8],
-    cotton: [0.35, 0.7],
-    maize: [0.45, 0.75],
-    sugarcane: [0.55, 0.8],
+async function fetchSatelliteFromConnector(
+  connectorUrl: string,
+  connectorApiKey: string | undefined,
+  location: { latitude: number; longitude: number },
+  cropType: string,
+  provider: "sentinel" | "bhuvan",
+): Promise<SatelliteData> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
   };
 
-  const [minNdvi, maxNdvi] = ndviRanges[cropType.toLowerCase()] || [0.4, 0.75];
+  if (connectorApiKey) {
+    headers["x-api-key"] = connectorApiKey;
+  }
+
+  const response = await fetch(connectorUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      provider,
+      cropType,
+      location,
+    }),
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new Error(
+      `Satellite connector request failed (${response.status}): ${responseText.slice(0, 300)}`,
+    );
+  }
+
+  const payload = await response.json();
+  return parseSatelliteData(payload, provider);
+}
+
+function parseSatelliteData(
+  payload: unknown,
+  expectedProvider: "sentinel" | "bhuvan",
+): SatelliteData {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Satellite connector response must be a JSON object.");
+  }
+
+  const source = payload as {
+    ndvi?: unknown;
+    cloudCover?: unknown;
+    imageDate?: unknown;
+    source?: unknown;
+  };
+
+  const connectorSource = source.source;
+  if (connectorSource !== expectedProvider) {
+    throw new Error(
+      `Satellite connector source mismatch: expected '${expectedProvider}', got '${String(connectorSource)}'.`,
+    );
+  }
 
   return {
-    ndvi: minNdvi + Math.random() * (maxNdvi - minNdvi),
-    cloudCover: Math.random() * 30, // Assume good weather
-    imageDate: new Date().toISOString().split("T")[0],
-    source: "mock",
+    ndvi: parseFiniteNumber(source.ndvi, "satellite.ndvi"),
+    cloudCover: parseFiniteNumber(source.cloudCover, "satellite.cloudCover"),
+    imageDate: parseIsoDate(source.imageDate, "satellite.imageDate"),
+    source: expectedProvider,
   };
 }
+
+function parseFiniteNumber(value: unknown, fieldName: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`Invalid ${fieldName}: expected finite number.`);
+  }
+  return value;
+}
+
+function parseIsoDate(value: unknown, fieldName: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Invalid ${fieldName}: expected non-empty ISO date string.`);
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Invalid ${fieldName}: invalid date value.`);
+  }
+
+  return value;
+}
+
+// ========== Crop Baselines ==========
 
 /**
  * Get regional NDVI baseline for crop type and growth stage
