@@ -1,0 +1,12 @@
+{
+  "records": {
+    "APP_1775678468093_07J63O": {
+      "applicationId": "APP_1775678468093_07J63O",
+      "farmerId": "farmer_1775678467679",
+      "status": "COMPLETED",
+      "createdAt": 1775678468096,
+      "updatedAt": 1775678468893,
+      "decision": "REJECTED"
+    }
+  }
+}

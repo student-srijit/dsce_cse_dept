@@ -10,6 +10,12 @@ import { VoiceRecorder } from "@/components/gramcredit/voice-recorder";
 import { DecisionCard } from "@/components/gramcredit/decision-card";
 import { ExplanationCard } from "@/components/gramcredit/explanation-card";
 import { Spinner } from "@/components/ui/spinner";
+import { useLanguage } from "@/components/language/language-provider";
+import {
+  pickText,
+  reasonCodeText,
+  tryPageText,
+} from "@/lib/gramcredit/ui-i18n";
 
 interface ApplicationStep {
   phase: "consent" | "profile" | "voice" | "processing" | "result";
@@ -99,29 +105,13 @@ interface FarmerProfile {
   preferredLanguage: "en" | "hi" | "ta" | "te" | "kn";
 }
 
-function reasonCodeToMessage(reasonCode: string): string {
-  const mapping: Record<string, string> = {
-    VOICE_HIGH_CONSCIENTIOUSNESS:
-      "Your voice interview shows strong discipline and planning behavior.",
-    VOICE_HIGH_AGREEABLENESS:
-      "Your responses suggest high trustworthiness and cooperative behavior.",
-    SOCIAL_STRONG_NETWORK:
-      "Your village transaction graph shows strong community trust links.",
-    SOCIAL_MODERATE_NETWORK:
-      "Your social trust network is stable, with room for stronger peer connectivity.",
-    SOCIAL_FRAUD_INDICATORS:
-      "Your social graph has unusual patterns that need verification.",
-    SATELLITE_HEALTHY_CROP:
-      "Satellite analysis indicates healthy crop growth in your field.",
-    SATELLITE_STRESSED_CROP:
-      "Satellite data shows crop stress, which slightly increases repayment risk.",
-    BEHAVIOR_HIGH_REGULARITY:
-      "Your UPI and recharge behavior is consistent across recent months.",
-    BEHAVIOR_LOW_REGULARITY:
-      "Your mobile payment behavior appears irregular and affects your score.",
-  };
+function reasonCodeToMessage(reasonCode: string, language: FarmerProfile["preferredLanguage"]): string {
+  const matched = reasonCodeText[reasonCode];
+  if (matched) {
+    return pickText(matched, language);
+  }
 
-  return mapping[reasonCode] || reasonCode.replaceAll("_", " ").toLowerCase();
+  return reasonCode.replaceAll("_", " ").toLowerCase();
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -148,6 +138,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 export default function TryPage() {
+  const { language } = useLanguage();
   const [step, setStep] = useState<ApplicationStep>({ phase: "consent" });
   const [consentKyc, setConsentKyc] = useState<ConsentKycData | null>(null);
   const [farmerProfile, setFarmerProfile] = useState<FarmerProfile | null>(
@@ -174,13 +165,13 @@ export default function TryPage() {
 
   const handleRecordingComplete = async (blob: Blob) => {
     if (!farmerProfile) {
-      setError("Farmer profile is missing. Please start again.");
+      setError(pickText(tryPageText.missingProfile, language));
       setStep({ phase: "consent" });
       return;
     }
 
     if (!consentKyc) {
-      setError("Consent and KYC details are missing. Please start again.");
+      setError(pickText(tryPageText.missingKyc, language));
       setStep({ phase: "consent" });
       return;
     }
@@ -224,7 +215,17 @@ export default function TryPage() {
       setStep({ phase: "result" });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(`Failed to process application: ${errorMessage}`);
+      const prefix =
+        language === "hi"
+          ? "आवेदन प्रोसेस नहीं हो सका"
+          : language === "ta"
+            ? "விண்ணப்பத்தை செயலாக்க முடியவில்லை"
+            : language === "te"
+              ? "అప్లికేషన్ ప్రాసెస్ కాలేదు"
+              : language === "kn"
+                ? "ಅರ್ಜಿಯನ್ನು ಸಂಸ್ಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
+                : "Failed to process application";
+      setError(`${prefix}: ${errorMessage}`);
       setStep({ phase: "voice" });
     } finally {
       setIsLoading(false);
@@ -251,7 +252,7 @@ export default function TryPage() {
         `/api/gramcredit/status/${result.applicationId}`,
       );
       if (!response.ok) {
-        throw new Error("Unable to fetch application status");
+        throw new Error(pickText(tryPageText.statusFetchError, language));
       }
 
       const statusPayload: ApplicationStatusRecord = await response.json();
@@ -260,27 +261,27 @@ export default function TryPage() {
       const message =
         statusError instanceof Error
           ? statusError.message
-          : "Unable to fetch application status";
+          : pickText(tryPageText.statusFetchError, language);
       setError(message);
     } finally {
       setIsStatusLoading(false);
     }
   };
 
-  const selectedLanguage = farmerProfile?.preferredLanguage || "en";
+  const selectedLanguage = language;
   const topReasons =
     result?.attributions
       .filter((attribution) => attribution.direction === "positive")
       .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
       .slice(0, 3)
-      .map((attribution) => reasonCodeToMessage(attribution.reasonCode)) || [];
+      .map((attribution) => reasonCodeToMessage(attribution.reasonCode, selectedLanguage)) || [];
 
   const improvements =
     result?.attributions
       .filter((attribution) => attribution.direction === "negative")
       .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
       .slice(0, 2)
-      .map((attribution) => reasonCodeToMessage(attribution.reasonCode)) || [];
+      .map((attribution) => reasonCodeToMessage(attribution.reasonCode, selectedLanguage)) || [];
 
   const decisionDisbursement =
     result?.decision.decision === "APPROVED" && result.disbursement
@@ -307,16 +308,17 @@ export default function TryPage() {
       : undefined;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-emerald-50 via-lime-50 to-amber-50 py-8 px-4">
+    <main className="min-h-screen bg-linear-to-b from-emerald-50 via-lime-50 to-amber-50 py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-8">
         <div className="text-center space-y-2">
           <p className="text-sm uppercase tracking-[0.2em] text-emerald-700">
-            Live Demo
+            {pickText(tryPageText.liveDemo, language)}
           </p>
-          <h1 className="text-4xl font-bold text-foreground">Try GramCredit</h1>
+          <h1 className="text-4xl font-bold text-foreground">
+            {pickText(tryPageText.title, language)}
+          </h1>
           <p className="text-base text-muted-foreground">
-            Complete profile, record voice, and get a loan decision in under two
-            minutes.
+            {pickText(tryPageText.subtitle, language)}
           </p>
         </div>
 
@@ -368,11 +370,10 @@ export default function TryPage() {
           <div className="flex flex-col items-center justify-center py-16 space-y-4 rounded-xl border border-emerald-200 bg-white/70">
             <Spinner className="w-12 h-12" />
             <h2 className="text-xl font-semibold text-foreground">
-              Processing Your Application
+              {pickText(tryPageText.processingTitle, language)}
             </h2>
             <p className="text-sm text-muted-foreground text-center max-w-md">
-              Analyzing voice psychometrics, social GNN trust graph, satellite
-              crop health, and mobile behavior before generating your GramScore.
+              {pickText(tryPageText.processingDetail, language)}
             </p>
           </div>
         )}
@@ -393,7 +394,16 @@ export default function TryPage() {
               gramScore={result.gramScore.score}
               signals={[
                 {
-                  name: "Voice Interview",
+                  name:
+                    language === "hi"
+                      ? "वॉइस इंटरव्यू"
+                      : language === "ta"
+                        ? "குரல் நேர்காணல்"
+                        : language === "te"
+                          ? "వాయిస్ ఇంటర్వ్యూ"
+                          : language === "kn"
+                            ? "ಧ್ವನಿ ಸಂದರ್ಶನ"
+                            : "Voice Interview",
                   score: result.gramScore.signals.voice,
                   confidence:
                     result.attributions.find(
@@ -406,7 +416,16 @@ export default function TryPage() {
                       : "negative",
                 },
                 {
-                  name: "Social Trust",
+                  name:
+                    language === "hi"
+                      ? "सामाजिक भरोसा"
+                      : language === "ta"
+                        ? "சமூக நம்பிக்கை"
+                        : language === "te"
+                          ? "సామాజిక నమ్మకం"
+                          : language === "kn"
+                            ? "ಸಾಮಾಜಿಕ ನಂಬಿಕೆ"
+                            : "Social Trust",
                   score: result.gramScore.signals.social,
                   confidence:
                     result.attributions.find(
@@ -419,7 +438,16 @@ export default function TryPage() {
                       : "negative",
                 },
                 {
-                  name: "Crop Health",
+                  name:
+                    language === "hi"
+                      ? "फसल स्वास्थ्य"
+                      : language === "ta"
+                        ? "பயிர் ஆரோக்கியம்"
+                        : language === "te"
+                          ? "పంట ఆరోగ్యం"
+                          : language === "kn"
+                            ? "ಬೆಳೆ ಆರೋಗ್ಯ"
+                            : "Crop Health",
                   score: result.gramScore.signals.satellite,
                   confidence:
                     result.attributions.find(
@@ -432,7 +460,16 @@ export default function TryPage() {
                       : "negative",
                 },
                 {
-                  name: "Financial Behavior",
+                  name:
+                    language === "hi"
+                      ? "वित्तीय व्यवहार"
+                      : language === "ta"
+                        ? "நிதி நடத்தை"
+                        : language === "te"
+                          ? "ఆర్థిక ప్రవర్తన"
+                          : language === "kn"
+                            ? "ಆರ್ಥಿಕ ವರ್ತನೆ"
+                            : "Financial Behavior",
                   score: result.gramScore.signals.behavior,
                   confidence:
                     result.attributions.find(
@@ -453,11 +490,11 @@ export default function TryPage() {
               onClick={handleReset}
               className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
-              Start New Application
+              {pickText(tryPageText.newApplication, language)}
             </button>
 
             <p className="text-xs text-center text-muted-foreground">
-              Application ID: {result.applicationId}
+              {pickText(tryPageText.appId, language)}: {result.applicationId}
             </p>
 
             <button
@@ -465,22 +502,24 @@ export default function TryPage() {
               className="w-full px-4 py-2 bg-white text-foreground border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
               disabled={isStatusLoading}
             >
-              {isStatusLoading ? "Checking status..." : "Check Application Status"}
+              {isStatusLoading
+                ? pickText(tryPageText.checkingStatus, language)
+                : pickText(tryPageText.checkStatus, language)}
             </button>
 
             {statusRecord && (
               <div className="p-4 bg-white rounded-lg border border-gray-200">
                 <p className="text-sm font-semibold text-foreground">
-                  Current Status: {statusRecord.status}
+                  {pickText(tryPageText.currentStatus, language)}: {statusRecord.status}
                 </p>
                 {statusRecord.decision && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Decision: {statusRecord.decision}
+                    {pickText(tryPageText.decision, language)}: {statusRecord.decision}
                   </p>
                 )}
                 {statusRecord.reason && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Reason: {statusRecord.reason}
+                    {pickText(tryPageText.reason, language)}: {statusRecord.reason}
                   </p>
                 )}
               </div>

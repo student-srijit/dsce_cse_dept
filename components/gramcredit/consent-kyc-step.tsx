@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field";
+import { useLanguage } from "@/components/language/language-provider";
+import { consentText, pickText } from "@/lib/gramcredit/ui-i18n";
 
 export interface ConsentKycData {
   consent: {
@@ -36,6 +38,7 @@ export function ConsentKycStep({
   onSubmit,
   isLoading = false,
 }: ConsentKycStepProps) {
+  const { language } = useLanguage();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [dataProcessingAccepted, setDataProcessingAccepted] = useState(false);
   const [kycIdType, setKycIdType] = useState<
@@ -48,15 +51,15 @@ export function ConsentKycStep({
     const nextErrors: Record<string, string> = {};
 
     if (!termsAccepted) {
-      nextErrors.terms = "You must accept terms to continue";
+      nextErrors.terms = pickText(consentText.errTerms, language);
     }
 
     if (!dataProcessingAccepted) {
-      nextErrors.data = "You must consent to data processing";
+      nextErrors.data = pickText(consentText.errData, language);
     }
 
     if (!kycIdNumber.trim() || kycIdNumber.trim().length < 4) {
-      nextErrors.kycId = "KYC ID number must be at least 4 characters";
+      nextErrors.kycId = pickText(consentText.errKyc, language);
     }
 
     setErrors(nextErrors);
@@ -85,10 +88,10 @@ export function ConsentKycStep({
     <Card className="p-6 space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-foreground">
-          Consent and KYC Verification
+          {pickText(consentText.title, language)}
         </h3>
         <p className="text-sm text-muted-foreground mt-1">
-          We need your consent and one ID document for responsible underwriting.
+          {pickText(consentText.subtitle, language)}
         </p>
       </div>
 
@@ -105,8 +108,7 @@ export function ConsentKycStep({
                 disabled={isLoading}
               />
               <label htmlFor="termsAccepted" className="text-sm text-foreground">
-                I accept the terms of service and understand this application may
-                require manual review.
+                {pickText(consentText.terms, language)}
               </label>
             </div>
             {errors.terms && (
@@ -128,8 +130,7 @@ export function ConsentKycStep({
                 htmlFor="dataProcessingAccepted"
                 className="text-sm text-foreground"
               >
-                I consent to audio, profile, and transaction data processing for
-                credit assessment.
+                {pickText(consentText.dataConsent, language)}
               </label>
             </div>
             {errors.data && <p className="text-sm text-red-600">{errors.data}</p>}
@@ -138,7 +139,7 @@ export function ConsentKycStep({
 
         <FieldGroup>
           <Field>
-            <FieldLabel>KYC Document Type</FieldLabel>
+            <FieldLabel>{pickText(consentText.kycDocType, language)}</FieldLabel>
             <Select
               value={kycIdType}
               onValueChange={(value) =>
@@ -161,11 +162,11 @@ export function ConsentKycStep({
           </Field>
 
           <Field>
-            <FieldLabel>KYC ID Number</FieldLabel>
+            <FieldLabel>{pickText(consentText.kycNumber, language)}</FieldLabel>
             <Input
               value={kycIdNumber}
               onChange={(e) => setKycIdNumber(e.target.value)}
-              placeholder="Enter document number"
+              placeholder={pickText(consentText.kycPlaceholder, language)}
               disabled={isLoading}
             />
             {errors.kycId && (
@@ -175,7 +176,7 @@ export function ConsentKycStep({
         </FieldGroup>
 
         <Button type="submit" disabled={isLoading} className="w-full">
-          Continue to Farmer Profile
+          {pickText(consentText.continueProfile, language)}
         </Button>
       </form>
     </Card>

@@ -4,6 +4,12 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, Square, Play } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useLanguage } from "@/components/language/language-provider";
+import {
+  formatWithValues,
+  pickText,
+  voiceText,
+} from "@/lib/gramcredit/ui-i18n";
 
 interface VoiceRecorderProps {
   onRecordingComplete: (audioBlob: Blob) => void;
@@ -11,6 +17,7 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceRecorderProps) {
+  const { language } = useLanguage();
   const minDurationSeconds = 15;
   const [isRecording, setIsRecording] = useState(false);
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
@@ -59,7 +66,9 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
 
         if (elapsedSeconds < minDurationSeconds) {
           setError(
-            `Please record for at least ${minDurationSeconds} seconds for reliable analysis.`,
+            formatWithValues(pickText(voiceText.minDuration, language), {
+              seconds: minDurationSeconds,
+            }),
           );
           setRecordedAudio(null);
           setAudioUrl("");
@@ -79,7 +88,7 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
       recordingStartedAtRef.current = Date.now();
       setIsRecording(true);
     } catch (err) {
-      setError("Failed to access microphone. Please check permissions.");
+      setError(pickText(voiceText.micError, language));
       console.error("Microphone access error:", err);
     }
   };
@@ -109,9 +118,9 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
   return (
     <Card className="p-6 space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Voice Interview</h3>
+        <h3 className="text-lg font-semibold text-foreground">{pickText(voiceText.title, language)}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Record your voice response to the interview questions. This helps us understand your creditworthiness better.
+          {pickText(voiceText.subtitle, language)}
         </p>
       </div>
 
@@ -133,12 +142,12 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
               {isRecording ? (
                 <>
                   <Square className="w-4 h-4 mr-2" />
-                  Stop Recording
+                  {pickText(voiceText.stop, language)}
                 </>
               ) : (
                 <>
                   <Mic className="w-4 h-4 mr-2" />
-                  Start Recording
+                  {pickText(voiceText.start, language)}
                 </>
               )}
             </Button>
@@ -146,9 +155,9 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
         ) : (
           <div className="space-y-3">
             <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-              <p className="text-sm text-green-700 font-medium">Recording captured</p>
+              <p className="text-sm text-green-700 font-medium">{pickText(voiceText.captured, language)}</p>
               <p className="text-xs text-green-600 mt-1">
-                Duration: {recordingDurationSeconds}s | Size: {(recordedAudio.size / 1024).toFixed(1)} KB
+                {pickText(voiceText.duration, language)}: {recordingDurationSeconds}s | {pickText(voiceText.size, language)}: {(recordedAudio.size / 1024).toFixed(1)} KB
               </p>
             </div>
             <audio src={audioUrl} controls className="w-full h-8" />
@@ -158,13 +167,15 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
                 disabled={isLoading}
                 className="flex-1"
               >
-                {isLoading ? "Processing..." : "Use This Recording"}
+                {isLoading
+                  ? pickText(voiceText.processing, language)
+                  : pickText(voiceText.useRecording, language)}
               </Button>
               <Button
                 onClick={clearRecording}
                 variant="outline"
               >
-                Re-record
+                {pickText(voiceText.rerecord, language)}
               </Button>
             </div>
           </div>
