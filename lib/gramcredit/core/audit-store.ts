@@ -73,7 +73,9 @@ function isSensitiveKey(key: string): boolean {
     return false;
   }
 
-  return sensitiveKeyPatterns.some((pattern) => normalizedKey.includes(pattern));
+  return sensitiveKeyPatterns.some((pattern) =>
+    normalizedKey.includes(pattern),
+  );
 }
 
 function redactValue(value: unknown, parentKey?: string): unknown {

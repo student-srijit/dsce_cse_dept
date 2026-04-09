@@ -4,10 +4,21 @@ import { ApplicationRequest } from "@/lib/gramcredit/core/types";
 import { createTraceLogger } from "@/lib/gramcredit/core/trace-logger";
 import { generateApplicationId } from "@/lib/gramcredit/core/module-utils";
 import { upsertApplicationStatus } from "@/lib/gramcredit/core/application-store";
-import { checkRateLimit, resolveRequesterKey } from "@/lib/gramcredit/core/rate-limit";
+import {
+  checkRateLimit,
+  resolveRequesterKey,
+} from "@/lib/gramcredit/core/rate-limit";
 import { persistApiAuditEvent } from "@/lib/gramcredit/core/audit-store";
 
 const SUPPORTED_LANGUAGES = new Set(["en", "hi", "ta", "te", "kn"]);
+const ALLOWED_LOAN_PURPOSES = new Set([
+  "medical",
+  "education",
+  "farming",
+  "emergency",
+]);
+const MIN_REQUESTED_LOAN_AMOUNT = 5000;
+const MAX_REQUESTED_LOAN_AMOUNT = 50000;
 
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -136,6 +147,10 @@ export async function POST(request: NextRequest) {
     const requestedLoanAmount = asNumber(
       body?.requestedLoanAmount ?? loanRequestBody?.amount,
     );
+    const requestedLoanPurposeRaw = asString(
+      body?.loanPurpose ?? loanRequestBody?.purpose,
+    );
+    const requestedLoanPurpose = requestedLoanPurposeRaw?.toLowerCase() ?? null;
 
     const consentTermsAccepted = asBoolean(consent?.termsAccepted);
     const consentDataProcessingAccepted = asBoolean(
@@ -146,6 +161,8 @@ export async function POST(request: NextRequest) {
 
     const kycIdType = asString(kyc?.idType);
     const kycIdNumber = asString(kyc?.idNumber);
+    const kycVerified = asBoolean(kyc?.verified);
+    const kycVerificationMethod = asString(kyc?.verificationMethod);
 
     const validKycTypes = new Set([
       "aadhaar",
@@ -179,8 +196,22 @@ export async function POST(request: NextRequest) {
         "farmerProfile.preferredLanguage must be one of en, hi, ta, te, kn",
       );
     }
-    if (requestedLoanAmount === null || requestedLoanAmount <= 0) {
-      validationErrors.push("requestedLoanAmount must be > 0");
+    if (
+      requestedLoanAmount === null ||
+      requestedLoanAmount < MIN_REQUESTED_LOAN_AMOUNT ||
+      requestedLoanAmount > MAX_REQUESTED_LOAN_AMOUNT
+    ) {
+      validationErrors.push(
+        `requestedLoanAmount must be between INR ${MIN_REQUESTED_LOAN_AMOUNT} and ${MAX_REQUESTED_LOAN_AMOUNT}`,
+      );
+    }
+    if (
+      !requestedLoanPurpose ||
+      !ALLOWED_LOAN_PURPOSES.has(requestedLoanPurpose)
+    ) {
+      validationErrors.push(
+        "loanPurpose must be one of medical, education, farming, emergency",
+      );
     }
     if (consentTermsAccepted !== true) {
       validationErrors.push("consent.termsAccepted must be true");
@@ -201,6 +232,16 @@ export async function POST(request: NextRequest) {
     }
     if (!kycIdNumber || kycIdNumber.length < 4) {
       validationErrors.push("kyc.idNumber must be at least 4 characters");
+    }
+    if (kycIdType === "pan") {
+      if (kycVerified !== true) {
+        validationErrors.push("kyc.verified must be true for PAN submissions");
+      }
+      if (kycVerificationMethod !== "pan_ocr") {
+        validationErrors.push(
+          "kyc.verificationMethod must be pan_ocr for PAN submissions",
+        );
+      }
     }
 
     if (validationErrors.length > 0) {
@@ -303,10 +344,7 @@ export async function POST(request: NextRequest) {
           tenureMonths !== null && tenureMonths > 0
             ? Math.round(tenureMonths)
             : undefined,
-        purpose:
-          asString(body?.loanPurpose) ||
-          asString(loanRequestBody?.purpose) ||
-          undefined,
+        purpose: requestedLoanPurpose!,
         cropCycle,
       },
       consent: {
@@ -318,7 +356,7 @@ export async function POST(request: NextRequest) {
       kyc: {
         idType: kycIdType as "aadhaar" | "pan" | "voter_id" | "driving_license",
         idNumberMasked: `****${kycIdNumber!.slice(-4)}`,
-        verified: false,
+        verified: kycVerified === true,
       },
       metadata: {
         timestamp: Date.now(),

@@ -5,7 +5,10 @@
  */
 
 import { GramCreditTraceLogger } from "../../core/trace-logger";
-import type { SatelliteModuleOutput, CropHealthMetrics } from "../../core/types";
+import type {
+  SatelliteModuleOutput,
+  CropHealthMetrics,
+} from "../../core/types";
 import { getGramCreditConfig } from "../../core/config";
 import {
   validateScore,
@@ -31,7 +34,7 @@ export async function scoreSatelliteCropModule(
   cropType: string,
   plantedDate?: string,
   logger?: GramCreditTraceLogger,
-  mockMode: boolean = false
+  mockMode: boolean = false,
 ): Promise<SatelliteModuleOutput> {
   const config = getGramCreditConfig();
   const startTime = Date.now();
@@ -55,7 +58,7 @@ export async function scoreSatelliteCropModule(
     const satelliteData = await fetchSatelliteData(
       location,
       cropType,
-      config.satellite.defaultProvider
+      config.satellite.defaultProvider,
     );
 
     moduleLogger.logProcessing("satellite_crop", "data_fetched", {
@@ -70,7 +73,7 @@ export async function scoreSatelliteCropModule(
       moduleLogger.logValidation(
         "satellite_crop",
         false,
-        `High cloud cover (${satelliteData.cloudCover}%), NDVI may be unreliable`
+        `High cloud cover (${satelliteData.cloudCover}%), NDVI may be unreliable`,
       );
     }
 
@@ -79,7 +82,7 @@ export async function scoreSatelliteCropModule(
     if (plantedDate) {
       const plantDate = new Date(plantedDate);
       const daysSincePlanting = Math.floor(
-        (Date.now() - plantDate.getTime()) / (1000 * 60 * 60 * 24)
+        (Date.now() - plantDate.getTime()) / (1000 * 60 * 60 * 24),
       );
       if (daysSincePlanting < 30) {
         plantingStage = "germination";
@@ -91,27 +94,23 @@ export async function scoreSatelliteCropModule(
     }
 
     // ========== Compute NDVI Health Score ==========
-    const ndviCategory = getHealthCategory(satelliteData.ndvi, config.satellite.ndviHealthThreshold);
+    const ndviCategory = getHealthCategory(
+      satelliteData.ndvi,
+      config.satellite.ndviHealthThreshold,
+    );
 
     // Normalize NDVI to 0-100 health score
     // NDVI typically ranges -1 (water/dead) to +1 (healthy vegetation)
-    const healthScore = normalizeMinMax(
-      satelliteData.ndvi,
-      -1,
-      1
-    );
+    const healthScore = normalizeMinMax(satelliteData.ndvi, -1, 1);
 
     // ========== Detect Fraud Anomalies ==========
     // Compare to regional baseline
-    const regionalBaseline = getRegionalBaseline(
-      cropType,
-      plantingStage
-    );
+    const regionalBaseline = getRegionalBaseline(cropType, plantingStage);
 
     const anomalyScore = simpleAnomalyScore(
       [regionalBaseline, 0.5], // Use baseline and neutral as reference
       satelliteData.ndvi,
-      config.satellite.anomalyDetectionSensitivity
+      config.satellite.anomalyDetectionSensitivity,
     );
 
     const fraudConfidence = anomalyScore > 0.6 ? anomalyScore : 0;
@@ -149,7 +148,7 @@ export async function scoreSatelliteCropModule(
         confidence,
         reasonCode,
       },
-      Date.now() - startTime
+      Date.now() - startTime,
     );
 
     const cropHealthMetrics: CropHealthMetrics = {
@@ -187,7 +186,7 @@ export async function scoreSatelliteCropModule(
       error instanceof Error ? error.message : String(error),
       "SATELLITE_PROCESSING_ERROR",
       0,
-      {}
+      {},
     );
   }
 }
@@ -212,10 +211,13 @@ async function fetchSatelliteData(
 /**
  * Fetch from Sentinel-2 via Sentinel Hub API
  */
-async function fetchSentinel2Data(location: {
-  latitude: number;
-  longitude: number;
-}, cropType: string): Promise<SatelliteData> {
+async function fetchSentinel2Data(
+  location: {
+    latitude: number;
+    longitude: number;
+  },
+  cropType: string,
+): Promise<SatelliteData> {
   const config = getGramCreditConfig();
 
   if (!config.satellite.connectorUrl) {
@@ -236,10 +238,13 @@ async function fetchSentinel2Data(location: {
 /**
  * Fetch from ISRO Bhuvan API
  */
-async function fetchBhuvanData(location: {
-  latitude: number;
-  longitude: number;
-}, cropType: string): Promise<SatelliteData> {
+async function fetchBhuvanData(
+  location: {
+    latitude: number;
+    longitude: number;
+  },
+  cropType: string,
+): Promise<SatelliteData> {
   const config = getGramCreditConfig();
 
   if (!config.satellite.connectorUrl) {
@@ -332,7 +337,9 @@ function parseFiniteNumber(value: unknown, fieldName: string): number {
 
 function parseIsoDate(value: unknown, fieldName: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(`Invalid ${fieldName}: expected non-empty ISO date string.`);
+    throw new Error(
+      `Invalid ${fieldName}: expected non-empty ISO date string.`,
+    );
   }
 
   const parsed = new Date(value);
@@ -348,10 +355,7 @@ function parseIsoDate(value: unknown, fieldName: string): string {
 /**
  * Get regional NDVI baseline for crop type and growth stage
  */
-function getRegionalBaseline(
-  cropType: string,
-  stage: string
-): number {
+function getRegionalBaseline(cropType: string, stage: string): number {
   const baselines: Record<string, Record<string, number>> = {
     wheat: {
       germination: 0.1,
@@ -385,9 +389,7 @@ function getRegionalBaseline(
     },
   };
 
-  return (
-    baselines[cropType.toLowerCase()]?.[stage] || 0.5
-  );
+  return baselines[cropType.toLowerCase()]?.[stage] || 0.5;
 }
 
 /**
@@ -395,7 +397,7 @@ function getRegionalBaseline(
  */
 function getHealthCategory(
   ndvi: number,
-  thresholds: { healthy: number; struggling: number; critical: number }
+  thresholds: { healthy: number; struggling: number; critical: number },
 ): "HEALTHY" | "STRESSED" | "CRITICAL" | "UNKNOWN" | "RECENTLY_PLANTED" {
   if (ndvi < -0.1) {
     return "UNKNOWN"; // Water or non-vegetation
@@ -415,7 +417,7 @@ function getHealthCategory(
  */
 function generateReasonCode(
   ndviCategory: string,
-  anomalyScore: number
+  anomalyScore: number,
 ): string {
   if (anomalyScore > 0.6) {
     return "SATELLITE_FRAUD_ALERT";

@@ -349,7 +349,10 @@ export default function TryPage() {
         </div>
 
         {step.phase === "consent" && (
-          <ConsentKycStep onSubmit={handleConsentSubmit} isLoading={isLoading} />
+          <ConsentKycStep
+            onSubmit={handleConsentSubmit}
+            isLoading={isLoading}
+          />
         )}
 
         {step.phase === "profile" && (

@@ -117,7 +117,9 @@ const DisbursementConfigSchema = z.object({
       interestRate: 10,
     },
   ]),
-  repaymentSchedule: z.enum(["weekly", "bi-weekly", "monthly"]).default("bi-weekly"),
+  repaymentSchedule: z
+    .enum(["weekly", "bi-weekly", "monthly"])
+    .default("bi-weekly"),
   latePaymentPenalty: z.number().default(0.02),
 });
 
@@ -167,8 +169,10 @@ export function loadGramCreditConfig(): GramCreditConfig {
       minClusterSize:
         process.env.GRAMCREDIT_MIN_CLUSTER_SIZE &&
         parseInt(process.env.GRAMCREDIT_MIN_CLUSTER_SIZE),
-      trustNormalization: process.env
-        .GRAMCREDIT_TRUST_NORMALIZATION as "minmax" | "zscore" | undefined,
+      trustNormalization: process.env.GRAMCREDIT_TRUST_NORMALIZATION as
+        | "minmax"
+        | "zscore"
+        | undefined,
       connectorUrl: process.env.GRAMCREDIT_SOCIAL_CONNECTOR_URL,
       connectorApiKey: process.env.GRAMCREDIT_SOCIAL_CONNECTOR_API_KEY,
     },
@@ -190,8 +194,10 @@ export function loadGramCreditConfig(): GramCreditConfig {
       anomalyDetectionSensitivity:
         process.env.GRAMCREDIT_ANOMALY_SENSITIVITY &&
         parseFloat(process.env.GRAMCREDIT_ANOMALY_SENSITIVITY),
-      defaultProvider: process.env
-        .GRAMCREDIT_SATELLITE_PROVIDER as "sentinel" | "bhuvan" | undefined,
+      defaultProvider: process.env.GRAMCREDIT_SATELLITE_PROVIDER as
+        | "sentinel"
+        | "bhuvan"
+        | undefined,
       imageSearchWindowDays:
         process.env.GRAMCREDIT_IMAGE_SEARCH_DAYS &&
         parseInt(process.env.GRAMCREDIT_IMAGE_SEARCH_DAYS),
@@ -219,13 +225,23 @@ export function loadGramCreditConfig(): GramCreditConfig {
     },
     fusion: {
       weights: {
-        voice: process.env.GRAMCREDIT_WEIGHT_VOICE && parseFloat(process.env.GRAMCREDIT_WEIGHT_VOICE),
-        socialGraph: process.env.GRAMCREDIT_WEIGHT_SOCIAL && parseFloat(process.env.GRAMCREDIT_WEIGHT_SOCIAL),
-        satellite: process.env.GRAMCREDIT_WEIGHT_SATELLITE && parseFloat(process.env.GRAMCREDIT_WEIGHT_SATELLITE),
-        behavior: process.env.GRAMCREDIT_WEIGHT_BEHAVIOR && parseFloat(process.env.GRAMCREDIT_WEIGHT_BEHAVIOR),
+        voice:
+          process.env.GRAMCREDIT_WEIGHT_VOICE &&
+          parseFloat(process.env.GRAMCREDIT_WEIGHT_VOICE),
+        socialGraph:
+          process.env.GRAMCREDIT_WEIGHT_SOCIAL &&
+          parseFloat(process.env.GRAMCREDIT_WEIGHT_SOCIAL),
+        satellite:
+          process.env.GRAMCREDIT_WEIGHT_SATELLITE &&
+          parseFloat(process.env.GRAMCREDIT_WEIGHT_SATELLITE),
+        behavior:
+          process.env.GRAMCREDIT_WEIGHT_BEHAVIOR &&
+          parseFloat(process.env.GRAMCREDIT_WEIGHT_BEHAVIOR),
       },
-      normalizationMethod: process.env
-        .GRAMCREDIT_NORMALIZATION as "minmax" | "zscore" | undefined,
+      normalizationMethod: process.env.GRAMCREDIT_NORMALIZATION as
+        | "minmax"
+        | "zscore"
+        | undefined,
     },
     decision: {
       approvalThresholds: {
@@ -276,7 +292,7 @@ export function loadGramCreditConfig(): GramCreditConfig {
       }
       // Preserve empty objects so Zod object defaults can be applied.
       return value;
-    })
+    }),
   );
 
   // Validate and merge with defaults
@@ -291,7 +307,7 @@ export function loadGramCreditConfig(): GramCreditConfig {
 
   if (Math.abs(weightSum - 1.0) > 0.01) {
     throw new Error(
-      `Signal weights must sum to 1.0, got ${weightSum}. Current: voice=${config.fusion.weights.voice}, social=${config.fusion.weights.socialGraph}, satellite=${config.fusion.weights.satellite}, behavior=${config.fusion.weights.behavior}`
+      `Signal weights must sum to 1.0, got ${weightSum}. Current: voice=${config.fusion.weights.voice}, social=${config.fusion.weights.socialGraph}, satellite=${config.fusion.weights.satellite}, behavior=${config.fusion.weights.behavior}`,
     );
   }
 

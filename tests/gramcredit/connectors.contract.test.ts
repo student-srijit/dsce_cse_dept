@@ -202,16 +202,56 @@ const tests: AsyncCase[] = [
             status: 200,
             json: {
               upiTransactions: [
-                { date: "2026-03-01T00:00:00.000Z", amount: 1200, type: "credit" },
-                { date: "2026-03-10T00:00:00.000Z", amount: 1400, type: "debit" },
-                { date: "2026-03-18T00:00:00.000Z", amount: 1350, type: "credit" },
-                { date: "2026-03-25T00:00:00.000Z", amount: 1500, type: "debit" },
-                { date: "2026-04-01T00:00:00.000Z", amount: 1600, type: "credit" },
-                { date: "2026-04-05T00:00:00.000Z", amount: 1250, type: "debit" },
-                { date: "2026-04-10T00:00:00.000Z", amount: 1700, type: "credit" },
-                { date: "2026-04-12T00:00:00.000Z", amount: 1450, type: "debit" },
-                { date: "2026-04-14T00:00:00.000Z", amount: 1550, type: "credit" },
-                { date: "2026-04-15T00:00:00.000Z", amount: 1650, type: "debit" },
+                {
+                  date: "2026-03-01T00:00:00.000Z",
+                  amount: 1200,
+                  type: "credit",
+                },
+                {
+                  date: "2026-03-10T00:00:00.000Z",
+                  amount: 1400,
+                  type: "debit",
+                },
+                {
+                  date: "2026-03-18T00:00:00.000Z",
+                  amount: 1350,
+                  type: "credit",
+                },
+                {
+                  date: "2026-03-25T00:00:00.000Z",
+                  amount: 1500,
+                  type: "debit",
+                },
+                {
+                  date: "2026-04-01T00:00:00.000Z",
+                  amount: 1600,
+                  type: "credit",
+                },
+                {
+                  date: "2026-04-05T00:00:00.000Z",
+                  amount: 1250,
+                  type: "debit",
+                },
+                {
+                  date: "2026-04-10T00:00:00.000Z",
+                  amount: 1700,
+                  type: "credit",
+                },
+                {
+                  date: "2026-04-12T00:00:00.000Z",
+                  amount: 1450,
+                  type: "debit",
+                },
+                {
+                  date: "2026-04-14T00:00:00.000Z",
+                  amount: 1550,
+                  type: "credit",
+                },
+                {
+                  date: "2026-04-15T00:00:00.000Z",
+                  amount: 1650,
+                  type: "debit",
+                },
               ],
               recharges: [
                 { date: "2026-03-03T00:00:00.000Z", amount: 199 },
@@ -244,7 +284,8 @@ const tests: AsyncCase[] = [
       await withEnvironment(
         {
           GRAMCREDIT_SATELLITE_PROVIDER: "bhuvan",
-          GRAMCREDIT_SATELLITE_CONNECTOR_URL: "https://connector.test/satellite",
+          GRAMCREDIT_SATELLITE_CONNECTOR_URL:
+            "https://connector.test/satellite",
         },
         async () => {
           const restoreFetch = mockFetchOnce({
@@ -283,7 +324,8 @@ const tests: AsyncCase[] = [
       await withEnvironment(
         {
           GRAMCREDIT_SATELLITE_PROVIDER: "bhuvan",
-          GRAMCREDIT_SATELLITE_CONNECTOR_URL: "https://connector.test/satellite",
+          GRAMCREDIT_SATELLITE_CONNECTOR_URL:
+            "https://connector.test/satellite",
         },
         async () => {
           const restoreFetch = mockFetchOnce({
@@ -328,7 +370,8 @@ async function run(): Promise<void> {
       console.log(`PASS: ${test.name}`);
     } catch (error) {
       failed += 1;
-      const message = error instanceof Error ? error.stack || error.message : String(error);
+      const message =
+        error instanceof Error ? error.stack || error.message : String(error);
       console.error(`FAIL: ${test.name}`);
       console.error(message);
     }

@@ -323,4 +323,3 @@ function computeSocialScore(gnnResult: {
 
   return validateScore(score, 0, 100, 50);
 }
-

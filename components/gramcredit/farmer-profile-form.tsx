@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -33,7 +34,7 @@ interface FarmerProfile {
   pastLoanCount: number;
   landOwnershipType: "owned" | "leased" | "shared";
   requestedLoanAmount: number;
-  loanPurpose: string;
+  loanPurpose: "medical" | "education" | "farming" | "emergency";
   location: {
     lat: number;
     lon: number;
@@ -98,6 +99,13 @@ const LANGUAGES = [
   { code: "kn", label: "ಕನ್ನಡ (Kannada)" },
 ];
 
+const LOAN_PURPOSE_OPTIONS = [
+  "medical",
+  "education",
+  "farming",
+  "emergency",
+] as const;
+
 export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfileFormProps) {
   const { language, setLanguage } = useLanguage();
   const [formData, setFormData] = useState<FarmerProfile>({
@@ -115,8 +123,8 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
     hasStorage: false,
     pastLoanCount: 0,
     landOwnershipType: "owned",
-    requestedLoanAmount: 50000,
-    loanPurpose: "Seasonal crop working capital",
+    requestedLoanAmount: 20000,
+    loanPurpose: "farming",
     location: {
       lat: 20.5937,
       lon: 78.9629,
@@ -167,11 +175,11 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
     if (formData.annualIncome <= 0) {
       newErrors.annualIncome = translate("Annual income must be greater than 0", "वार्षिक आय 0 से अधिक होनी चाहिए", "வருமானம் 0-ஐ விட அதிகமாக இருக்க வேண்டும்", "వార్షిక ఆదాయం 0 కంటే ఎక్కువ ఉండాలి", "ವಾರ್ಷಿಕ ಆದಾಯ 0 ಕ್ಕಿಂತ ಹೆಚ್ಚು ಇರಬೇಕು");
     }
-    if (formData.requestedLoanAmount <= 0) {
-      newErrors.requestedLoanAmount = translate("Requested amount must be greater than 0", "मांगी गई राशि 0 से अधिक होनी चाहिए", "கோரிய தொகை 0-ஐ விட அதிகமாக இருக்க வேண்டும்", "అభ్యర్థించిన మొత్తం 0 కంటే ఎక్కువ ఉండాలి", "ಅಭ್ಯರ್ಥಿಸಿದ ಮೊತ್ತ 0 ಕ್ಕಿಂತ ಹೆಚ್ಚಿರಬೇಕು");
+    if (formData.requestedLoanAmount < 5000 || formData.requestedLoanAmount > 50000) {
+      newErrors.requestedLoanAmount = translate("Requested amount must be between INR 5,000 and 50,000", "मांगी गई राशि 5,000 से 50,000 के बीच होनी चाहिए", "கோரிய தொகை INR 5,000 முதல் 50,000 வரை இருக்க வேண்டும்", "అభ్యర్థించిన మొత్తం INR 5,000 నుండి 50,000 మధ్య ఉండాలి", "ಅಭ್ಯರ್ಥಿಸಿದ ಮೊತ್ತ INR 5,000 ರಿಂದ 50,000 ನಡುವೆ ಇರಬೇಕು");
     }
-    if (!formData.loanPurpose.trim()) {
-      newErrors.loanPurpose = translate("Loan purpose is required", "ऋण का उद्देश्य आवश्यक है", "கடன் நோக்கம் அவசியம்", "రుణ ప్రయోజనం అవసరం", "ಸಾಲ ಉದ್ದೇಶ ಅಗತ್ಯ");
+    if (!LOAN_PURPOSE_OPTIONS.includes(formData.loanPurpose)) {
+      newErrors.loanPurpose = translate("Loan purpose must be one of medical, education, farming, or emergency", "ऋण उद्देश्य medical, education, farming या emergency में से एक होना चाहिए", "கடன் நோக்கம் medical, education, farming அல்லது emergency ஆக இருக்க வேண்டும்", "రుణ ప్రయోజనం medical, education, farming లేదా emergency లో ఒకటి కావాలి", "ಸಾಲ ಉದ್ದೇಶ medical, education, farming ಅಥವಾ emergency ಆಗಿರಬೇಕು");
     }
 
     setErrors(newErrors);
@@ -202,10 +210,14 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
               type="text"
               placeholder={translate("Your full name", "आपका पूरा नाम", "உங்கள் முழு பெயர்", "మీ పూర్తి పేరు", "ನಿಮ್ಮ ಪೂರ್ಣ ಹೆಸರು")}
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               disabled={isLoading}
             />
-            {errors.name && <p className="text-sm text-red-600 mt-1">{errors.name}</p>}
+            {errors.name && (
+              <p className="text-sm text-red-600 mt-1">{errors.name}</p>
+            )}
           </Field>
 
           <Field>
@@ -221,7 +233,9 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
               min="18"
               max="100"
             />
-            {errors.age && <p className="text-sm text-red-600 mt-1">{errors.age}</p>}
+            {errors.age && (
+              <p className="text-sm text-red-600 mt-1">{errors.age}</p>
+            )}
           </Field>
         </FieldGroup>
 
@@ -503,36 +517,56 @@ export function FarmerProfileForm({ onSubmit, isLoading = false }: FarmerProfile
 
         <FieldGroup>
           <Field>
-            <FieldLabel>{translate("Requested Loan Amount (INR)", "मांगी गई ऋण राशि (INR)", "கோரிய கடன் தொகை (INR)", "అభ్యర్థించిన రుణ మొత్తం (INR)", "ಅಭ್ಯರ್ಥಿಸಿದ ಸಾಲ ಮೊತ್ತ (INR)")}</FieldLabel>
-            <Input
-              type="number"
-              value={formData.requestedLoanAmount}
-              onChange={(e) =>
+            <FieldLabel>{translate("Loan Purpose", "ऋण का उद्देश्य", "கடன் நோக்கம்", "రుణ ప్రయోజనం", "ಸಾಲ ಉದ್ದೇಶ")}</FieldLabel>
+            <Select
+              value={formData.loanPurpose}
+              onValueChange={(value) =>
                 setFormData({
                   ...formData,
-                  requestedLoanAmount: parseFloat(e.target.value) || 0,
+                  loanPurpose: value as FarmerProfile["loanPurpose"],
                 })
               }
               disabled={isLoading}
-              min="1000"
-            />
-            {errors.requestedLoanAmount && (
-              <p className="text-sm text-red-600 mt-1">{errors.requestedLoanAmount}</p>
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="medical">{translate("Medical", "चिकित्सा", "மருத்துவம்", "మెడికల్", "ವೈದ್ಯಕೀಯ")}</SelectItem>
+                <SelectItem value="education">{translate("Education", "शिक्षा", "கல்வி", "విద్య", "ಶಿಕ್ಷಣ")}</SelectItem>
+                <SelectItem value="farming">{translate("Farming", "खेती", "விவசாயம்", "వ్యవసాయం", "ಕೃಷಿ")}</SelectItem>
+                <SelectItem value="emergency">{translate("Emergency", "आपातकाल", "அவசரம்", "అత్యవసరం", "ತುರ್ತು")}</SelectItem>
+              </SelectContent>
+            </Select>
+            {errors.loanPurpose && (
+              <p className="text-sm text-red-600 mt-1">{errors.loanPurpose}</p>
             )}
           </Field>
 
           <Field>
-            <FieldLabel>{translate("Loan Purpose", "ऋण का उद्देश्य", "கடன் நோக்கம்", "రుణ ప్రయోజనం", "ಸಾಲ ಉದ್ದೇಶ")}</FieldLabel>
-            <Input
-              type="text"
-              value={formData.loanPurpose}
-              onChange={(e) =>
-                setFormData({ ...formData, loanPurpose: e.target.value })
-              }
-              disabled={isLoading}
-            />
-            {errors.loanPurpose && (
-              <p className="text-sm text-red-600 mt-1">{errors.loanPurpose}</p>
+            <FieldLabel>{translate("Requested Loan Amount (INR 5,000 - 50,000)", "मांगी गई ऋण राशि (INR 5,000 - 50,000)", "கோரிய கடன் தொகை (INR 5,000 - 50,000)", "అభ్యర్థించిన రుణ మొత్తం (INR 5,000 - 50,000)", "ಅಭ್ಯರ್ಥಿಸಿದ ಸಾಲ ಮೊತ್ತ (INR 5,000 - 50,000)")}</FieldLabel>
+            <div className="space-y-3">
+              <Slider
+                value={[formData.requestedLoanAmount]}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    requestedLoanAmount: value[0] ?? formData.requestedLoanAmount,
+                  })
+                }
+                min={5000}
+                max={50000}
+                step={1000}
+                disabled={isLoading}
+              />
+              <p className="text-sm font-medium text-foreground">
+                INR {formData.requestedLoanAmount.toLocaleString("en-IN")}
+              </p>
+            </div>
+            {errors.requestedLoanAmount && (
+              <p className="text-sm text-red-600 mt-1">
+                {errors.requestedLoanAmount}
+              </p>
             )}
           </Field>
         </FieldGroup>

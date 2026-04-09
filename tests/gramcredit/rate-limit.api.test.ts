@@ -53,9 +53,8 @@ async function run(): Promise<void> {
   process.env.GRAMCREDIT_RATE_LIMIT_MAX_APPLY = "20";
   process.env.GRAMCREDIT_RATE_LIMIT_MAX_REVIEW = "1";
 
-  const reviewRoute = await import(
-    "../../app/api/gramcredit/review/[applicationId]/route"
-  );
+  const reviewRoute =
+    await import("../../app/api/gramcredit/review/[applicationId]/route");
   const appStore = await import("../../lib/gramcredit/core/application-store");
 
   const applicationId = "APP_RATE_LIMIT_TEST";
@@ -126,7 +125,8 @@ async function run(): Promise<void> {
 }
 
 run().catch((error) => {
-  const message = error instanceof Error ? error.stack || error.message : String(error);
+  const message =
+    error instanceof Error ? error.stack || error.message : String(error);
   console.error(message);
   process.exitCode = 1;
 });

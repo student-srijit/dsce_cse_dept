@@ -79,7 +79,7 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
         setRecordedAudio(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
-        
+
         // Stop all audio tracks
         stream.getTracks().forEach((track) => track.stop());
       };

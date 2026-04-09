@@ -8,11 +8,14 @@ interface RouteContext {
 
 type ReviewAction = "MARK_UNDER_REVIEW" | "APPROVE" | "REJECT";
 
-function createPostRequest(body: {
-  reviewer: string;
-  note: string;
-  action: ReviewAction;
-}, bearerToken?: string): any {
+function createPostRequest(
+  body: {
+    reviewer: string;
+    note: string;
+    action: ReviewAction;
+  },
+  bearerToken?: string,
+): any {
   const headers = new Headers();
   if (bearerToken) {
     headers.set("authorization", `Bearer ${bearerToken}`);
@@ -55,12 +58,10 @@ async function run(): Promise<void> {
   process.env.GRAMCREDIT_RATE_LIMIT_MAX_APPLY = "20";
   process.env.GRAMCREDIT_RATE_LIMIT_MAX_REVIEW = "20";
 
-  const reviewRoute = await import(
-    "../../app/api/gramcredit/review/[applicationId]/route"
-  );
-  const statusRoute = await import(
-    "../../app/api/gramcredit/status/[applicationId]/route"
-  );
+  const reviewRoute =
+    await import("../../app/api/gramcredit/review/[applicationId]/route");
+  const statusRoute =
+    await import("../../app/api/gramcredit/status/[applicationId]/route");
   const appStore = await import("../../lib/gramcredit/core/application-store");
 
   const applicationId = "APP_REVIEW_API_TEST";
@@ -141,7 +142,10 @@ async function run(): Promise<void> {
 
   assert.ok(persisted.records);
   assert.ok(persisted.records?.[applicationId]);
-  assert.equal(persisted.records?.[applicationId]?.status, "REVIEW_IN_PROGRESS");
+  assert.equal(
+    persisted.records?.[applicationId]?.status,
+    "REVIEW_IN_PROGRESS",
+  );
   assert.equal(
     persisted.records?.[applicationId]?.reviewHistory?.[0]?.action,
     "MARK_UNDER_REVIEW",
@@ -152,7 +156,8 @@ async function run(): Promise<void> {
 }
 
 run().catch((error) => {
-  const message = error instanceof Error ? error.stack || error.message : String(error);
+  const message =
+    error instanceof Error ? error.stack || error.message : String(error);
   console.error(message);
   process.exitCode = 1;
 });

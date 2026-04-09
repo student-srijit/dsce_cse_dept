@@ -32,7 +32,7 @@ export async function scoreBehaviorSignalModule(
   farmerId: string,
   logger: GramCreditTraceLogger,
   mockMode: boolean = false,
-  customData?: BehaviorSignalData
+  customData?: BehaviorSignalData,
 ): Promise<BehaviorModuleOutput> {
   const config = getGramCreditConfig();
   const startTime = Date.now();
@@ -69,14 +69,14 @@ export async function scoreBehaviorSignalModule(
         "No transaction data available",
         "BEHAVIOR_NO_DATA",
         0,
-        {}
+        {},
       );
     }
 
     // ========== Analyze UPI Patterns ==========
     const upiMetrics = analyzeUPITransactions(
       behaviorData.upiTransactions,
-      config.behavior.minTransactionsRequired
+      config.behavior.minTransactionsRequired,
     );
 
     logModuleProcessing(logger, "behavior_signal", "upi_analysis_complete", {
@@ -89,27 +89,32 @@ export async function scoreBehaviorSignalModule(
     // ========== Analyze Recharge Patterns ==========
     const rechargeMetrics = analyzeRechargePatterns(
       behaviorData.recharges,
-      behaviorData.analysisWindow
+      behaviorData.analysisWindow,
     );
 
-    logModuleProcessing(logger, "behavior_signal", "recharge_analysis_complete", {
-      rechargeCount: behaviorData.recharges.length,
-      regularity: rechargeMetrics.regularity,
-      consistency: rechargeMetrics.consistency,
-    });
+    logModuleProcessing(
+      logger,
+      "behavior_signal",
+      "recharge_analysis_complete",
+      {
+        rechargeCount: behaviorData.recharges.length,
+        regularity: rechargeMetrics.regularity,
+        consistency: rechargeMetrics.consistency,
+      },
+    );
 
     // ========== Detect Anomalies ==========
     const anomalyDetected = detectAnomalies(
       behaviorData.upiTransactions,
       behaviorData.recharges,
-      config.behavior.anomalyThreshold
+      config.behavior.anomalyThreshold,
     );
 
     if (anomalyDetected) {
       logger.logValidation(
         "behavior_signal",
         false,
-        "Anomalies detected in behavior pattern"
+        "Anomalies detected in behavior pattern",
       );
     }
 
@@ -118,14 +123,14 @@ export async function scoreBehaviorSignalModule(
       upiMetrics,
       rechargeMetrics,
       anomalyDetected,
-      config.behavior
+      config.behavior,
     );
 
     // ========== Compute Confidence ==========
     const confidence = computeConfidence(
       behaviorData.upiTransactions.length,
       behaviorData.recharges.length,
-      config.behavior.minTransactionsRequired
+      config.behavior.minTransactionsRequired,
     );
 
     const reasonCode = generateReasonCode(disciplineScore, anomalyDetected);
@@ -141,7 +146,7 @@ export async function scoreBehaviorSignalModule(
         upiMetrics,
         rechargeMetrics,
       },
-      Date.now() - startTime
+      Date.now() - startTime,
     );
 
     const metrics: BehaviorMetrics = {
@@ -175,7 +180,7 @@ export async function scoreBehaviorSignalModule(
       error instanceof Error ? error.message : String(error),
       "BEHAVIOR_PROCESSING_ERROR",
       0,
-      {}
+      {},
     );
   }
 }
@@ -192,7 +197,7 @@ interface UPIMetrics {
 
 function analyzeUPITransactions(
   transactions: Array<{ date: Date; amount: number; type: string }>,
-  minRequired: number
+  minRequired: number,
 ): UPIMetrics {
   if (transactions.length < minRequired) {
     return {
@@ -206,7 +211,7 @@ function analyzeUPITransactions(
 
   // Sort by date
   const sorted = [...transactions].sort(
-    (a, b) => a.date.getTime() - b.date.getTime()
+    (a, b) => a.date.getTime() - b.date.getTime(),
   );
 
   // Compute frequency (transactions per 30 days)
@@ -215,8 +220,8 @@ function analyzeUPITransactions(
   const daysDifference = Math.max(
     1,
     Math.floor(
-      (newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24)
-    )
+      (newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24),
+    ),
   );
   const frequency = (transactions.length / daysDifference) * 30;
 
@@ -225,7 +230,7 @@ function analyzeUPITransactions(
   for (let i = 1; i < sorted.length; i++) {
     const days = Math.floor(
       (sorted[i].date.getTime() - sorted[i - 1].date.getTime()) /
-        (1000 * 60 * 60 * 24)
+        (1000 * 60 * 60 * 24),
     );
     if (days > 0) {
       intervals.push(days);
@@ -239,21 +244,17 @@ function analyzeUPITransactions(
       intervals.reduce((sum, x) => sum + Math.pow(x - avgInterval, 2), 0) /
       intervals.length;
     const stdDev = Math.sqrt(variance);
-    const coeffVariation =
-      stdDev / (avgInterval === 0 ? 1 : avgInterval);
+    const coeffVariation = stdDev / (avgInterval === 0 ? 1 : avgInterval);
     consistency = Math.max(0, 100 - coeffVariation * 50); // Lower CV = higher consistency
   }
 
   // Compute trend (recent vs old average)
   const midpoint = Math.floor(sorted.length / 2);
   const oldAverage =
-    sorted
-      .slice(0, midpoint)
-      .reduce((sum, t) => sum + t.amount, 0) / midpoint;
+    sorted.slice(0, midpoint).reduce((sum, t) => sum + t.amount, 0) / midpoint;
   const newAverage =
-    sorted
-      .slice(midpoint)
-      .reduce((sum, t) => sum + t.amount, 0) / (sorted.length - midpoint);
+    sorted.slice(midpoint).reduce((sum, t) => sum + t.amount, 0) /
+    (sorted.length - midpoint);
   const trend: "increasing" | "stable" | "decreasing" =
     newAverage > oldAverage * 1.1
       ? "increasing"
@@ -267,7 +268,7 @@ function analyzeUPITransactions(
   for (let i = 1; i < sorted.length; i++) {
     const days = Math.floor(
       (sorted[i].date.getTime() - sorted[i - 1].date.getTime()) /
-        (1000 * 60 * 60 * 24)
+        (1000 * 60 * 60 * 24),
     );
     if (days > INACTIVITY_THRESHOLD) {
       inactivityAlerts++;
@@ -295,7 +296,7 @@ interface RechargeMetrics {
 
 function analyzeRechargePatterns(
   recharges: Array<{ date: Date; amount: number }>,
-  windowDays: number
+  windowDays: number,
 ): RechargeMetrics {
   if (recharges.length < 2) {
     return {
@@ -305,14 +306,14 @@ function analyzeRechargePatterns(
   }
 
   const sorted = [...recharges].sort(
-    (a, b) => a.date.getTime() - b.date.getTime()
+    (a, b) => a.date.getTime() - b.date.getTime(),
   );
 
   const intervals: number[] = [];
   for (let i = 1; i < sorted.length; i++) {
     const days = Math.floor(
       (sorted[i].date.getTime() - sorted[i - 1].date.getTime()) /
-        (1000 * 60 * 60 * 24)
+        (1000 * 60 * 60 * 24),
     );
     if (days > 0) {
       intervals.push(days);
@@ -326,8 +327,7 @@ function analyzeRechargePatterns(
     };
   }
 
-  const avgInterval =
-    intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
   const variance =
     intervals.reduce((sum, x) => sum + Math.pow(x - avgInterval, 2), 0) /
     intervals.length;
@@ -346,14 +346,13 @@ function analyzeRechargePatterns(
 function detectAnomalies(
   upiTransactions: Array<{ date: Date; amount: number }>,
   recharges: Array<{ date: Date; amount: number }>,
-  threshold: number
+  threshold: number,
 ): boolean {
   // Flag 1: Sudden inactivity
   if (upiTransactions.length > 0) {
-    const lastTx =
-      upiTransactions[upiTransactions.length - 1].date;
+    const lastTx = upiTransactions[upiTransactions.length - 1].date;
     const daysSinceLastTx = Math.floor(
-      (Date.now() - lastTx.getTime()) / (1000 * 60 * 60 * 24)
+      (Date.now() - lastTx.getTime()) / (1000 * 60 * 60 * 24),
     );
     if (daysSinceLastTx > threshold * 10) {
       return true; // No activity for 30+ days
@@ -429,7 +428,9 @@ function parseBehaviorSignalData(
   };
 
   if (!Array.isArray(source.upiTransactions)) {
-    throw new Error("Behavior connector response missing 'upiTransactions' array.");
+    throw new Error(
+      "Behavior connector response missing 'upiTransactions' array.",
+    );
   }
   if (!Array.isArray(source.recharges)) {
     throw new Error("Behavior connector response missing 'recharges' array.");
@@ -490,7 +491,9 @@ function parseRecharge(value: unknown): { date: Date; amount: number } {
 
 function parseDate(value: unknown, fieldName: string): Date {
   if (typeof value !== "string" && typeof value !== "number") {
-    throw new Error(`Invalid ${fieldName}: expected string or number timestamp.`);
+    throw new Error(
+      `Invalid ${fieldName}: expected string or number timestamp.`,
+    );
   }
 
   const parsed = new Date(value);
@@ -516,7 +519,7 @@ function computeDisciplineScore(
   config: {
     rechargeRegularityWeight: number;
     transactionFrequencyWeight: number;
-  }
+  },
 ): number {
   let score = 50; // baseline
 
@@ -556,7 +559,7 @@ function computeDisciplineScore(
 function computeConfidence(
   upiCount: number,
   rechargeCount: number,
-  minRequired: number
+  minRequired: number,
 ): number {
   const totalDataPoints = upiCount + rechargeCount;
 
@@ -566,7 +569,7 @@ function computeConfidence(
 
   return Math.min(
     0.95,
-    0.7 + (totalDataPoints - minRequired) / (minRequired * 2) * 0.25
+    0.7 + ((totalDataPoints - minRequired) / (minRequired * 2)) * 0.25,
   );
 }
 

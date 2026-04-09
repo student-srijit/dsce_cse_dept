@@ -15,6 +15,6 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;
