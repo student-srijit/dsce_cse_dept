@@ -14,9 +14,16 @@ import {
 interface VoiceRecorderProps {
   onRecordingComplete: (audioBlob: Blob) => void;
   isLoading?: boolean;
+  interviewQuestions?: string[];
+  questionsLoading?: boolean;
 }
 
-export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceRecorderProps) {
+export function VoiceRecorder({
+  onRecordingComplete,
+  isLoading = false,
+  interviewQuestions = [],
+  questionsLoading = false,
+}: VoiceRecorderProps) {
   const { language } = useLanguage();
   const minDurationSeconds = 15;
   const [isRecording, setIsRecording] = useState(false);
@@ -123,6 +130,43 @@ export function VoiceRecorder({ onRecordingComplete, isLoading = false }: VoiceR
           {pickText(voiceText.subtitle, language)}
         </p>
       </div>
+
+      {questionsLoading && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+          <p className="text-sm text-blue-800">
+            {language === "hi"
+              ? "आपके प्रोफाइल के आधार पर इंटरव्यू प्रश्न तैयार हो रहे हैं..."
+              : language === "ta"
+                ? "உங்கள் சுயவிவரத்தின் அடிப்படையில் கேள்விகள் தயாராகின்றன..."
+                : language === "te"
+                  ? "మీ ప్రొఫైల్ ఆధారంగా ఇంటర్వ్యూ ప్రశ్నలు సిద్ధమవుతున్నాయి..."
+                  : language === "kn"
+                    ? "ನಿಮ್ಮ ಪ್ರೊಫೈಲ್ ಆಧಾರದ ಮೇಲೆ ಪ್ರಶ್ನೆಗಳು ಸಿದ್ಧವಾಗುತ್ತಿವೆ..."
+                    : "Generating interview questions from your profile..."}
+          </p>
+        </div>
+      )}
+
+      {interviewQuestions.length > 0 && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+          <p className="text-sm font-semibold text-blue-900">
+            {language === "hi"
+              ? "रिकॉर्डिंग में इन सवालों का जवाब दें:"
+              : language === "ta"
+                ? "பதிவில் இந்த கேள்விகளுக்கு பதிலளிக்கவும்:"
+                : language === "te"
+                  ? "రికార్డింగ్‌లో ఈ ప్రశ్నలకు సమాధానం ఇవ్వండి:"
+                  : language === "kn"
+                    ? "ದಾಖಲೆ ಮಾಡುವಾಗ ಈ ಪ್ರಶ್ನೆಗಳಿಗೆ ಉತ್ತರಿಸಿ:"
+                    : "Please answer these questions in your recording:"}
+          </p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-800">
+            {interviewQuestions.map((question, index) => (
+              <li key={`${index}-${question}`}>{question}</li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-md">

@@ -353,6 +353,12 @@ export default function HomePage() {
               {t.headerCta}
               <ArrowRight className="h-4 w-4" />
             </Link>
+            <Link
+              href="/prahari"
+              className="inline-flex items-center gap-2 rounded-full border border-zinc-900/15 bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-100"
+            >
+              PRAHARI
+            </Link>
           </div>
         </header>
 
@@ -376,6 +382,12 @@ export default function HomePage() {
               >
                 {t.heroButton}
                 <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/prahari"
+                className="inline-flex items-center gap-2 rounded-xl border border-zinc-900/15 bg-white px-5 py-3 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-50"
+              >
+                PRAHARI Farmer Safety
               </Link>
               <span className="text-sm text-zinc-700">{t.targetDecision}</span>
             </div>

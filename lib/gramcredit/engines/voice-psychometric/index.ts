@@ -68,10 +68,11 @@ export async function scoreVoiceModule(
     }
 
     // ========== Transcription ==========
+    // Use auto language detection so code-switching and different spoken languages are handled.
     const transcription = await transcribeAudio(
       audioData,
       logger,
-      preferredLanguage,
+      "auto",
     );
 
     if (transcription.duration > config.voice.maxAudioDuration) {

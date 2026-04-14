@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ConsentKycStep,
   type ConsentKycData,
@@ -105,6 +105,12 @@ interface FarmerProfile {
   preferredLanguage: "en" | "hi" | "ta" | "te" | "kn";
 }
 
+type InterviewQuestionResponse = {
+  questions: string[];
+  source: "groq" | "fallback";
+  language: string;
+};
+
 function reasonCodeToMessage(reasonCode: string, language: FarmerProfile["preferredLanguage"]): string {
   const matched = reasonCodeText[reasonCode];
   if (matched) {
@@ -149,6 +155,8 @@ export default function TryPage() {
   const [result, setResult] = useState<ApplicationResult | null>(null);
   const [statusRecord, setStatusRecord] =
     useState<ApplicationStatusRecord | null>(null);
+  const [interviewQuestions, setInterviewQuestions] = useState<string[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
   const handleConsentSubmit = (payload: ConsentKycData) => {
@@ -162,6 +170,43 @@ export default function TryPage() {
     setStep({ phase: "voice" });
     setError("");
   };
+
+  useEffect(() => {
+    async function generateInterviewQuestions() {
+      if (!farmerProfile || step.phase !== "voice") {
+        return;
+      }
+      setQuestionsLoading(true);
+      try {
+        const response = await fetch("/api/gramcredit/interview-questions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            farmerProfile,
+            requestedLoanAmount: farmerProfile.requestedLoanAmount,
+            loanPurpose: farmerProfile.loanPurpose,
+            language,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to generate interview questions");
+        }
+
+        const payload = (await response.json()) as InterviewQuestionResponse;
+        setInterviewQuestions(payload.questions || []);
+      } catch (err) {
+        console.error("Interview question generation failed", err);
+        setInterviewQuestions([]);
+      } finally {
+        setQuestionsLoading(false);
+      }
+    }
+
+    generateInterviewQuestions();
+  }, [farmerProfile, step.phase, language]);
 
   const handleRecordingComplete = async (blob: Blob) => {
     if (!farmerProfile) {
@@ -238,6 +283,7 @@ export default function TryPage() {
     setFarmerProfile(null);
     setResult(null);
     setStatusRecord(null);
+    setInterviewQuestions([]);
     setError("");
   };
 
@@ -366,6 +412,8 @@ export default function TryPage() {
           <VoiceRecorder
             onRecordingComplete={handleRecordingComplete}
             isLoading={isLoading}
+            interviewQuestions={interviewQuestions}
+            questionsLoading={questionsLoading}
           />
         )}
 

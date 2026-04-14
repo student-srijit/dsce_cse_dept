@@ -7,6 +7,22 @@
       "createdAt": 1775678468096,
       "updatedAt": 1775678468893,
       "decision": "REJECTED"
+    },
+    "APP_1775921966746_L6D7SJ": {
+      "applicationId": "APP_1775921966746_L6D7SJ",
+      "farmerId": "farmer_1775921966630",
+      "status": "COMPLETED",
+      "createdAt": 1775921966748,
+      "updatedAt": 1775921967253,
+      "decision": "REJECTED"
+    },
+    "APP_1776145817312_LQ7EQY": {
+      "applicationId": "APP_1776145817312_LQ7EQY",
+      "farmerId": "farmer_1776145817224",
+      "status": "COMPLETED",
+      "createdAt": 1776145817315,
+      "updatedAt": 1776145817655,
+      "decision": "REJECTED"
     }
   }
 }

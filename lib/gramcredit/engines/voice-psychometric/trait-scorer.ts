@@ -171,9 +171,11 @@ function parseStructuredJson(rawContent: string): Record<string, any> {
  */
 function buildOceanPrompt(transcript: string, language: string): string {
   const languageInstructions: Record<string, string> = {
-    en: "Score based on English personality indicators",
-    hi: "Hindi व्यक्तित्व संकेतकों के आधार पर स्कोर करें",
-    ta: "Tamil ஆளுமை குறிகாட்டிகளின் அடிப்படையில் மதிப்பிடுங்கள்",
+    en: "Score based on personality indicators in the transcript language.",
+    hi: "ट्रांसक्रिप्ट में हिंदी या मिश्रित भाषा संकेतकों के आधार पर स्कोर करें।",
+    ta: "தமிழ் அல்லது கலப்பு மொழி குறிகாட்டிகளின் அடிப்படையில் மதிப்பிடுங்கள்.",
+    te: "ట్రాన్స్‌క్రిప్ట్‌లో తెలుగు లేదా మిశ్రమ భాష సూచనల ఆధారంగా స్కోర్ చేయండి.",
+    kn: "ಟ್ರಾನ್ಸ್ಕ್ರಿಪ್ಟ್‌ನ ಕನ್ನಡ ಅಥವಾ ಮಿಶ್ರ ಭಾಷಾ ಸೂಚನೆಗಳ ಆಧಾರದಲ್ಲಿ ಸ್ಕೋರ್ ಮಾಡಿ.",
   };
 
   const langInstruction = languageInstructions[language] || languageInstructions.en;
@@ -186,9 +188,10 @@ Transcript:
 
 Instructions:
 1. ${langInstruction}
-2. Score each trait on a 0-100 scale
-3. 0 = Low/Disagree, 50 = Moderate, 100 = High/Strongly Agree
-4. Return a JSON object ONLY with the following structure:
+2. The speaker may code-switch across multiple Indian languages; infer meaning semantically.
+3. Score each trait on a 0-100 scale
+4. 0 = Low/Disagree, 50 = Moderate, 100 = High/Strongly Agree
+5. Return a JSON object ONLY with the following structure:
 {
   "openness": <number 0-100>,
   "conscientiousness": <number 0-100>,

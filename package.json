@@ -9,8 +9,11 @@
     "lint": "eslint .",
     "test:connectors": "tsx tests/gramcredit/connectors.contract.test.ts",
     "test:review-api": "tsx tests/gramcredit/review-status.api.test.ts",
+    "test:interview-questions": "tsx tests/gramcredit/interview-questions.api.test.ts",
     "test:rate-limit": "tsx tests/gramcredit/rate-limit.api.test.ts",
     "test:audit": "tsx tests/gramcredit/audit-redaction.test.ts",
+    "test:prahari": "tsx tests/prahari/pipeline.test.ts",
+    "test:prahari-api": "tsx tests/prahari/score.api.test.ts",
     "gnn:train": "python ml/gnn/train_social_gnn.py --epochs 260 --real-dataset-path data/real/soc-sign-bitcoinotc.csv.gz --num-time-windows 20 --min-time-fraction 0.2 --min-edges-per-graph 3000 --hidden-dim 48 --lr 0.0025 --output-json ml/gnn/gnn-weights.generated.json"
   },
   "dependencies": {
